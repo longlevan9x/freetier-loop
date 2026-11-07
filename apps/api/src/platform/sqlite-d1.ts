@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import type { DatabaseSync as DatabaseSyncType, SQLInputValue } from 'node:sqlite';
@@ -142,14 +142,16 @@ export const createSqliteD1Binding = (filename = ':memory:'): D1Binding => {
   return d1 as unknown as D1Binding;
 };
 
-const INITIAL_MIGRATION_PATH = resolve(
-  import.meta.dirname,
-  '../../../../packages/db/migrations/0000_faithful_imperial_guard.sql',
-);
+const MIGRATIONS_DIR = resolve(import.meta.dirname, '../../../../packages/db/migrations');
 
 export const applyMigrationsToD1 = async (d1: D1Binding): Promise<void> => {
-  const sql = readFileSync(INITIAL_MIGRATION_PATH, 'utf8');
-  await (d1 as unknown as { exec(q: string): Promise<unknown> }).exec(sql);
+  const files = readdirSync(MIGRATIONS_DIR)
+    .filter((f) => f.endsWith('.sql'))
+    .sort();
+  for (const file of files) {
+    const sql = readFileSync(resolve(MIGRATIONS_DIR, file), 'utf8');
+    await (d1 as unknown as { exec(q: string): Promise<unknown> }).exec(sql);
+  }
 };
 
 export const createAppDatabase = (d1: D1Binding): AppDatabase => drizzle(d1, { schema });

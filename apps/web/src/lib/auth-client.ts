@@ -28,31 +28,171 @@ export type AuthSessionUser = {
   name: string;
 };
 
+export type SignInResponse =
+  | { requiresTwoFactor: false; user: AuthSessionUser }
+  | {
+      requiresTwoFactor: true;
+      reason: 'new_device' | 'new_ip' | 'always_required';
+      ip: string;
+      country: string;
+    };
+
 export const signInWithTurnstile = async (input: {
   email: string;
   password: string;
-  captchaToken: string;
-}): Promise<{ user: AuthSessionUser }> => {
+  captchaToken?: string;
+  twoFactorCode?: string;
+}): Promise<SignInResponse> => {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+  };
+  if (input.captchaToken) {
+    headers[HEADER.CAPTCHA] = input.captchaToken;
+  }
+
   const res = await fetch(`${resolveApiPrefixUrl()}/sign-in/email`, {
     method: 'POST',
     credentials: 'include',
-    headers: {
-      'content-type': 'application/json',
-      [HEADER.CAPTCHA]: input.captchaToken,
-    },
+    headers,
     body: JSON.stringify({
       email: input.email,
       password: input.password,
+      twoFactorCode: input.twoFactorCode,
     }),
   });
   const json = (await res.json()) as {
-    data?: { user: AuthSessionUser };
+    data?: SignInResponse;
     error?: { code?: string; message?: string };
   };
   if (!res.ok || !json.data) {
     throw json;
   }
   return json.data;
+};
+
+export type ActiveSession = {
+  id: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  country: string | null;
+  createdAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+};
+
+export const fetchActiveSessions = async (): Promise<ActiveSession[]> => {
+  const res = await fetch(`${resolveApiPrefixUrl()}/sessions`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const json = (await res.json()) as {
+    data?: ActiveSession[];
+    error?: { code?: string; message?: string };
+  };
+  if (!res.ok || !json.data) {
+    throw json;
+  }
+  return json.data;
+};
+
+export const revokeSession = async (sessionId: string): Promise<void> => {
+  const res = await fetch(`${resolveApiPrefixUrl()}/sessions/${sessionId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  const json = (await res.json()) as {
+    data?: { revoked: boolean };
+    error?: { code?: string; message?: string };
+  };
+  if (!res.ok) {
+    throw json;
+  }
+};
+
+export const revokeOtherSessions = async (): Promise<void> => {
+  const res = await fetch(`${resolveApiPrefixUrl()}/sessions/revoke-others`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  const json = (await res.json()) as {
+    data?: { revoked: boolean };
+    error?: { code?: string; message?: string };
+  };
+  if (!res.ok) {
+    throw json;
+  }
+};
+
+export type TwoFactorStatus = {
+  enabled: boolean;
+  always: boolean;
+};
+
+export type TwoFactorSetup = {
+  secret: string;
+  otpauthUri: string;
+};
+
+export const fetchTwoFactorStatus = async (): Promise<TwoFactorStatus> => {
+  const res = await fetch(`${resolveApiPrefixUrl()}/2fa/status`, {
+    method: 'GET',
+    credentials: 'include',
+  });
+  const json = (await res.json()) as {
+    data?: TwoFactorStatus;
+    error?: { code?: string; message?: string };
+  };
+  if (!res.ok || !json.data) {
+    throw json;
+  }
+  return json.data;
+};
+
+export const setupTwoFactor = async (): Promise<TwoFactorSetup> => {
+  const res = await fetch(`${resolveApiPrefixUrl()}/2fa/setup`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  const json = (await res.json()) as {
+    data?: TwoFactorSetup;
+    error?: { code?: string; message?: string };
+  };
+  if (!res.ok || !json.data) {
+    throw json;
+  }
+  return json.data;
+};
+
+export const enableTwoFactor = async (code: string, always?: boolean): Promise<void> => {
+  const res = await fetch(`${resolveApiPrefixUrl()}/2fa/enable`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ code, always }),
+  });
+  const json = (await res.json()) as {
+    data?: { enabled: boolean };
+    error?: { code?: string; message?: string };
+  };
+  if (!res.ok) {
+    throw json;
+  }
+};
+
+export const disableTwoFactor = async (password: string): Promise<void> => {
+  const res = await fetch(`${resolveApiPrefixUrl()}/2fa/disable`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  const json = (await res.json()) as {
+    data?: { disabled: boolean };
+    error?: { code?: string; message?: string };
+  };
+  if (!res.ok) {
+    throw json;
+  }
 };
 
 export const fetchCurrentSession = async (): Promise<AuthSessionUser | null> => {

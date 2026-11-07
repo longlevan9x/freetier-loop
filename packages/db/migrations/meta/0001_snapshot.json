@@ -102,9 +102,7 @@
       "indexes": {
         "idx_account_user_id": {
           "name": "idx_account_user_id",
-          "columns": [
-            "user_id"
-          ],
+          "columns": ["user_id"],
           "isUnique": false
         }
       },
@@ -113,12 +111,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -162,9 +156,7 @@
       "indexes": {
         "rate_limit_key_unique": {
           "name": "rate_limit_key_unique",
-          "columns": [
-            "key"
-          ],
+          "columns": ["key"],
           "isUnique": true
         }
       },
@@ -243,16 +235,12 @@
       "indexes": {
         "session_token_unique": {
           "name": "session_token_unique",
-          "columns": [
-            "token"
-          ],
+          "columns": ["token"],
           "isUnique": true
         },
         "idx_session_user_id": {
           "name": "idx_session_user_id",
-          "columns": [
-            "user_id"
-          ],
+          "columns": ["user_id"],
           "isUnique": false
         }
       },
@@ -261,12 +249,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -310,9 +294,7 @@
       "indexes": {
         "idx_two_factor_user_id": {
           "name": "idx_two_factor_user_id",
-          "columns": [
-            "user_id"
-          ],
+          "columns": ["user_id"],
           "isUnique": false
         }
       },
@@ -321,12 +303,8 @@
           "name": "two_factor_user_id_user_id_fk",
           "tableFrom": "two_factor",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -423,9 +401,7 @@
       "indexes": {
         "user_email_unique": {
           "name": "user_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         }
       },
@@ -556,17 +532,12 @@
       "indexes": {
         "idx_audit_logs_created_at": {
           "name": "idx_audit_logs_created_at",
-          "columns": [
-            "created_at"
-          ],
+          "columns": ["created_at"],
           "isUnique": false
         },
         "idx_audit_logs_target": {
           "name": "idx_audit_logs_target",
-          "columns": [
-            "target_type",
-            "target_id"
-          ],
+          "columns": ["target_type", "target_id"],
           "isUnique": false
         }
       },
@@ -575,12 +546,8 @@
           "name": "audit_logs_user_id_user_id_fk",
           "tableFrom": "audit_logs",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -652,9 +619,7 @@
       "indexes": {
         "idx_job_events_job_id": {
           "name": "idx_job_events_job_id",
-          "columns": [
-            "job_id"
-          ],
+          "columns": ["job_id"],
           "isUnique": false
         }
       },
@@ -663,12 +628,8 @@
           "name": "job_events_job_id_jobs_id_fk",
           "tableFrom": "job_events",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -785,10 +746,7 @@
       "indexes": {
         "idx_job_steps_job_position": {
           "name": "idx_job_steps_job_position",
-          "columns": [
-            "job_id",
-            "position"
-          ],
+          "columns": ["job_id", "position"],
           "isUnique": false
         }
       },
@@ -797,12 +755,8 @@
           "name": "job_steps_job_id_jobs_id_fk",
           "tableFrom": "job_steps",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -918,23 +872,17 @@
       "indexes": {
         "idx_jobs_status": {
           "name": "idx_jobs_status",
-          "columns": [
-            "status"
-          ],
+          "columns": ["status"],
           "isUnique": false
         },
         "idx_jobs_source_account": {
           "name": "idx_jobs_source_account",
-          "columns": [
-            "source_account_id"
-          ],
+          "columns": ["source_account_id"],
           "isUnique": false
         },
         "idx_jobs_target_account": {
           "name": "idx_jobs_target_account",
-          "columns": [
-            "target_account_id"
-          ],
+          "columns": ["target_account_id"],
           "isUnique": false
         }
       },
@@ -943,12 +891,8 @@
           "name": "jobs_source_account_id_provider_accounts_id_fk",
           "tableFrom": "jobs",
           "tableTo": "provider_accounts",
-          "columnsFrom": [
-            "source_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -956,12 +900,8 @@
           "name": "jobs_target_account_id_provider_accounts_id_fk",
           "tableFrom": "jobs",
           "tableTo": "provider_accounts",
-          "columnsFrom": [
-            "target_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["target_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         },
@@ -969,12 +909,8 @@
           "name": "jobs_created_by_user_id_fk",
           "tableFrom": "jobs",
           "tableTo": "user",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
           "onDelete": "restrict",
           "onUpdate": "no action"
         }
@@ -1040,16 +976,12 @@
       "indexes": {
         "login_attempts_email_unique": {
           "name": "login_attempts_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         },
         "idx_login_attempts_email": {
           "name": "idx_login_attempts_email",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": false
         }
       },
@@ -1164,16 +1096,12 @@
       "indexes": {
         "idx_provider_accounts_provider": {
           "name": "idx_provider_accounts_provider",
-          "columns": [
-            "provider"
-          ],
+          "columns": ["provider"],
           "isUnique": false
         },
         "idx_provider_accounts_status": {
           "name": "idx_provider_accounts_status",
-          "columns": [
-            "status"
-          ],
+          "columns": ["status"],
           "isUnique": false
         }
       },
@@ -1259,24 +1187,17 @@
       "indexes": {
         "idx_resources_account_kind": {
           "name": "idx_resources_account_kind",
-          "columns": [
-            "provider_account_id",
-            "kind"
-          ],
+          "columns": ["provider_account_id", "kind"],
           "isUnique": false
         },
         "idx_resources_parent_id": {
           "name": "idx_resources_parent_id",
-          "columns": [
-            "parent_id"
-          ],
+          "columns": ["parent_id"],
           "isUnique": false
         },
         "idx_resources_name": {
           "name": "idx_resources_name",
-          "columns": [
-            "name"
-          ],
+          "columns": ["name"],
           "isUnique": false
         }
       },
@@ -1285,12 +1206,8 @@
           "name": "resources_provider_account_id_provider_accounts_id_fk",
           "tableFrom": "resources",
           "tableTo": "provider_accounts",
-          "columnsFrom": [
-            "provider_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["provider_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1369,16 +1286,12 @@
       "indexes": {
         "idx_snapshots_resource_id": {
           "name": "idx_snapshots_resource_id",
-          "columns": [
-            "resource_id"
-          ],
+          "columns": ["resource_id"],
           "isUnique": false
         },
         "idx_snapshots_job_id": {
           "name": "idx_snapshots_job_id",
-          "columns": [
-            "job_id"
-          ],
+          "columns": ["job_id"],
           "isUnique": false
         }
       },
@@ -1387,12 +1300,8 @@
           "name": "snapshots_job_id_jobs_id_fk",
           "tableFrom": "snapshots",
           "tableTo": "jobs",
-          "columnsFrom": [
-            "job_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1464,11 +1373,7 @@
       "indexes": {
         "idx_usage_snapshots_account_metric": {
           "name": "idx_usage_snapshots_account_metric",
-          "columns": [
-            "provider_account_id",
-            "metric",
-            "period_start"
-          ],
+          "columns": ["provider_account_id", "metric", "period_start"],
           "isUnique": false
         }
       },
@@ -1477,12 +1382,8 @@
           "name": "usage_snapshots_provider_account_id_provider_accounts_id_fk",
           "tableFrom": "usage_snapshots",
           "tableTo": "provider_accounts",
-          "columnsFrom": [
-            "provider_account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["provider_account_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }

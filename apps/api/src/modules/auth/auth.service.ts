@@ -8,11 +8,12 @@ import {
   ID_PREFIX,
   newId,
 } from '@freetier-loop/shared';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, gt, ne } from 'drizzle-orm';
 import type { AppConfig } from '../../config/env.schema';
 import type { AppDatabase } from '../../platform/db';
 import type { Clock } from '../../platform/deps';
 import type { PasswordHasher } from '../../platform/password-hasher';
+import { generateOtpAuthUri, generateTotpSecret, verifyTotpCode } from '../../platform/totp';
 import type { SessionUser } from '../../types';
 import type { AuditService } from '../audit/audit.service';
 
@@ -23,13 +24,34 @@ export type SignInInput = {
   password: string;
   captchaToken: string | undefined;
   ip: string;
+  country: string;
   userAgent: string;
+  twoFactorCode?: string | undefined;
 };
 
-export type SignInResult = {
-  token: string;
-  expiresAtMs: number;
-  user: SessionUser;
+export type SignInResult =
+  | {
+      requiresTwoFactor: false;
+      token: string;
+      expiresAtMs: number;
+      user: SessionUser;
+    }
+  | {
+      requiresTwoFactor: true;
+      reason: 'new_device' | 'new_ip' | 'always_required';
+      ip: string;
+      country: string;
+      userAgent: string;
+    };
+
+export type SessionItem = {
+  id: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  country: string | null;
+  createdAt: number;
+  expiresAt: number;
+  isCurrent: boolean;
 };
 
 export type SeedAdminInput = {
@@ -236,7 +258,9 @@ export class AuthService {
     const nowMs = this.clock.nowMs();
 
     await this.checkSignInRateLimit(input.ip);
-    await this.verifyTurnstile(input.captchaToken, input.ip);
+    if (!input.twoFactorCode || input.captchaToken) {
+      await this.verifyTurnstile(input.captchaToken, input.ip);
+    }
 
     if (!this.isEmailAllowlisted(normalizedEmail)) {
       await this.auditService.record({
@@ -335,6 +359,64 @@ export class AuthService {
         .where(eq(loginAttempts.id, attempt.id));
     }
 
+    // 2FA check (Adaptive or Always)
+    if (foundUser.twoFactorEnabled && foundUser.twoFactorSecret) {
+      const priorSessions = await this.db
+        .select()
+        .from(session)
+        .where(eq(session.userId, foundUser.id))
+        .limit(50);
+
+      const isKnownIp = priorSessions.some((s) => s.ipAddress === input.ip);
+      const isKnownDevice = priorSessions.some((s) => s.userAgent === input.userAgent);
+      const isAdaptiveChallengeNeeded = !isKnownIp || !isKnownDevice;
+      const mustChallenge = Boolean(foundUser.twoFactorAlways) || isAdaptiveChallengeNeeded;
+
+      if (mustChallenge) {
+        if (!input.twoFactorCode) {
+          const reason: 'new_device' | 'new_ip' | 'always_required' = foundUser.twoFactorAlways
+            ? 'always_required'
+            : !isKnownDevice
+              ? 'new_device'
+              : 'new_ip';
+
+          await this.auditService.record({
+            userId: foundUser.id,
+            action: 'auth.2fa.challenge_issued',
+            targetType: 'user',
+            targetId: foundUser.id,
+            ip: input.ip,
+            meta: { reason, country: input.country, userAgent: input.userAgent },
+          });
+
+          return {
+            requiresTwoFactor: true,
+            reason,
+            ip: input.ip,
+            country: input.country,
+            userAgent: input.userAgent,
+          };
+        }
+
+        const valid2fa = await verifyTotpCode(foundUser.twoFactorSecret, input.twoFactorCode);
+        if (!valid2fa) {
+          await this.recordFailedAttempt(normalizedEmail, input.ip);
+          await this.auditService.record({
+            userId: foundUser.id,
+            action: 'auth.2fa.failed',
+            targetType: 'user',
+            targetId: foundUser.id,
+            ip: input.ip,
+          });
+          throw new AppError(
+            ERROR_CODE.AUTH_INVALID_2FA,
+            'Invalid or expired 2FA code. Please check your authenticator app.',
+            { status: HTTP_STATUS.UNAUTHORIZED },
+          );
+        }
+      }
+    }
+
     const token = `${crypto.randomUUID().replace(/-/g, '')}${crypto.randomUUID().replace(/-/g, '')}`;
     const expiresAtMs = nowMs + AUTH.SESSION_TTL_SECONDS * 1000;
     const now = new Date(nowMs);
@@ -346,6 +428,7 @@ export class AuthService {
       expiresAt: new Date(expiresAtMs),
       ipAddress: input.ip,
       userAgent: input.userAgent,
+      country: input.country,
       createdAt: now,
       updatedAt: now,
     });
@@ -356,9 +439,15 @@ export class AuthService {
       targetType: 'user',
       targetId: foundUser.id,
       ip: input.ip,
+      meta: {
+        country: input.country,
+        userAgent: input.userAgent,
+        twoFactorVerified: Boolean(input.twoFactorCode),
+      },
     });
 
     return {
+      requiresTwoFactor: false,
       token,
       expiresAtMs,
       user: {
@@ -367,6 +456,170 @@ export class AuthService {
         name: foundUser.name,
       },
     };
+  }
+
+  async get2faStatus(userId: string): Promise<{ enabled: boolean; always: boolean }> {
+    const rows = await this.db
+      .select({
+        enabled: user.twoFactorEnabled,
+        always: user.twoFactorAlways,
+      })
+      .from(user)
+      .where(eq(user.id, userId))
+      .limit(1);
+
+    const u = rows[0];
+    if (!u) {
+      throw new AppError(ERROR_CODE.NOT_FOUND, 'User not found');
+    }
+    return {
+      enabled: Boolean(u.enabled),
+      always: Boolean(u.always),
+    };
+  }
+
+  async setup2fa(userId: string): Promise<{ secret: string; uri: string; otpauthUri: string }> {
+    const rows = await this.db.select().from(user).where(eq(user.id, userId)).limit(1);
+    const u = rows[0];
+    if (!u) {
+      throw new AppError(ERROR_CODE.NOT_FOUND, 'User not found');
+    }
+
+    const secret = generateTotpSecret();
+    const uri = generateOtpAuthUri(u.email, secret);
+
+    await this.db
+      .update(user)
+      .set({
+        twoFactorSecret: secret,
+        updatedAt: new Date(this.clock.nowMs()),
+      })
+      .where(eq(user.id, userId));
+
+    return { secret, uri, otpauthUri: uri };
+  }
+
+  async enable2fa(userId: string, code: string, always = false): Promise<void> {
+    const rows = await this.db.select().from(user).where(eq(user.id, userId)).limit(1);
+    const u = rows[0];
+    if (!u || !u.twoFactorSecret) {
+      throw new AppError(
+        ERROR_CODE.VALIDATION_ERROR,
+        'Please initiate 2FA setup first before enabling',
+      );
+    }
+
+    const valid = await verifyTotpCode(u.twoFactorSecret, code);
+    if (!valid) {
+      throw new AppError(
+        ERROR_CODE.AUTH_INVALID_2FA,
+        'Invalid 2FA code. Please check your authenticator app and try again.',
+      );
+    }
+
+    const now = new Date(this.clock.nowMs());
+    await this.db
+      .update(user)
+      .set({
+        twoFactorEnabled: true,
+        twoFactorAlways: always,
+        updatedAt: now,
+      })
+      .where(eq(user.id, userId));
+
+    await this.auditService.record({
+      userId,
+      action: 'auth.2fa.enabled',
+      targetType: 'user',
+      targetId: userId,
+      meta: { always },
+    });
+  }
+
+  async disable2fa(userId: string, password: string): Promise<void> {
+    const rows = await this.db
+      .select({
+        userId: user.id,
+        passwordHash: account.password,
+      })
+      .from(user)
+      .innerJoin(account, and(eq(account.userId, user.id), eq(account.providerId, 'credential')))
+      .where(eq(user.id, userId))
+      .limit(1);
+
+    const u = rows[0];
+    if (!u || !u.passwordHash) {
+      throw new AppError(ERROR_CODE.NOT_FOUND, 'User credential account not found');
+    }
+
+    const valid = await this.hasher.verify({
+      hash: u.passwordHash,
+      password,
+    });
+    if (!valid) {
+      throw new AppError(ERROR_CODE.AUTH_UNAUTHORIZED, 'Incorrect admin password');
+    }
+
+    const now = new Date(this.clock.nowMs());
+    await this.db
+      .update(user)
+      .set({
+        twoFactorEnabled: false,
+        twoFactorSecret: null,
+        twoFactorAlways: false,
+        updatedAt: now,
+      })
+      .where(eq(user.id, userId));
+
+    await this.auditService.record({
+      userId,
+      action: 'auth.2fa.disabled',
+      targetType: 'user',
+      targetId: userId,
+    });
+  }
+
+  async listSessions(userId: string, currentToken?: string): Promise<SessionItem[]> {
+    const now = new Date(this.clock.nowMs());
+    const rows = await this.db
+      .select()
+      .from(session)
+      .where(and(eq(session.userId, userId), gt(session.expiresAt, now)))
+      .orderBy(desc(session.createdAt));
+
+    return rows.map((s) => ({
+      id: s.id,
+      ipAddress: s.ipAddress,
+      userAgent: s.userAgent,
+      country: s.country,
+      createdAt: s.createdAt.getTime(),
+      expiresAt: s.expiresAt.getTime(),
+      isCurrent: Boolean(currentToken && s.token === currentToken),
+    }));
+  }
+
+  async revokeSession(userId: string, sessionId: string): Promise<void> {
+    await this.db.delete(session).where(and(eq(session.id, sessionId), eq(session.userId, userId)));
+
+    await this.auditService.record({
+      userId,
+      action: 'auth.session.revoked',
+      targetType: 'session',
+      targetId: sessionId,
+    });
+  }
+
+  async revokeOtherSessions(userId: string, currentToken: string): Promise<void> {
+    await this.db
+      .delete(session)
+      .where(and(eq(session.userId, userId), ne(session.token, currentToken)));
+
+    await this.auditService.record({
+      userId,
+      action: 'auth.session.revoke_others',
+      targetType: 'user',
+      targetId: userId,
+    });
   }
 
   async getSessionByToken(token: string | undefined): Promise<SessionUser | null> {

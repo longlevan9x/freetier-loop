@@ -64,7 +64,7 @@ export const generateTotpCode = async (
 
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
-    keyBytes,
+    keyBytes as unknown as BufferSource,
     { name: 'HMAC', hash: 'SHA-1' },
     false,
     ['sign'],
@@ -103,7 +103,11 @@ export const verifyTotpCode = async (
   }
 
   for (let w = -window; w <= window; w++) {
-    const expected = await generateTotpCode(secret, timestampSeconds + w * stepSeconds, stepSeconds);
+    const expected = await generateTotpCode(
+      secret,
+      timestampSeconds + w * stepSeconds,
+      stepSeconds,
+    );
     if (expected === cleanCode) {
       return true;
     }

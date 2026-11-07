@@ -11,6 +11,7 @@ import { buildSeedAdminSql } from '../../../../packages/db/scripts/seed-admin';
 import { createApp } from '../app';
 import { createDefaultDeps } from '../platform/deps';
 import { createInMemoryDatabase } from '../platform/sqlite-d1';
+import { generateTotpCode } from '../platform/totp';
 
 const createTestHarness = async (opts?: { failCaptcha?: boolean }) => {
   const { db } = await createInMemoryDatabase();
@@ -223,5 +224,172 @@ describe('M1 Auth & Security (T-031..T-036)', () => {
     expect(sixthRes.status).toBe(HTTP_STATUS.TOO_MANY_REQUESTS);
     const rateBody = (await sixthRes.json()) as { error: { code: string } };
     expect(rateBody.error.code).toBe(ERROR_CODE.AUTH_RATE_LIMITED);
+  });
+
+  it('supports adaptive 2FA setup, challenge on new IP/device, and active session management', async () => {
+    const { app } = await createTestHarness();
+
+    // 1. Initial sign in from a known IP and UA
+    const signIn1 = await app.request(`${AUTH_PREFIX}/sign-in/email`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        [HEADER.CAPTCHA]: 'pass-token',
+        'x-forwarded-for': '10.0.0.1',
+        'cf-ipcountry': 'VN',
+        'user-agent': 'Chrome-Device-1',
+      },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        password: 'CorrectHorseBatteryStaple!1',
+      }),
+    });
+    expect(signIn1.status).toBe(HTTP_STATUS.OK);
+    const cookie1 = (signIn1.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+
+    // 2. Setup 2FA
+    const setupRes = await app.request(`${AUTH_PREFIX}/2fa/setup`, {
+      method: 'POST',
+      headers: { cookie: cookie1 },
+    });
+    expect(setupRes.status).toBe(HTTP_STATUS.OK);
+    const setupData = ((await setupRes.json()) as { data: { secret: string; otpauthUri: string } })
+      .data;
+    expect(setupData.secret).toBeDefined();
+    expect(setupData.otpauthUri).toContain('otpauth://totp/');
+
+    // Generate valid TOTP code
+    const validCode = await generateTotpCode(setupData.secret);
+
+    // 3. Enable 2FA with valid code (adaptive mode: always = false)
+    const enableRes = await app.request(`${AUTH_PREFIX}/2fa/enable`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie: cookie1 },
+      body: JSON.stringify({ code: validCode, always: false }),
+    });
+    expect(enableRes.status).toBe(HTTP_STATUS.OK);
+
+    // Check 2FA status
+    const statusRes = await app.request(`${AUTH_PREFIX}/2fa/status`, {
+      headers: { cookie: cookie1 },
+    });
+    const statusData = ((await statusRes.json()) as { data: { enabled: boolean; always: boolean } })
+      .data;
+    expect(statusData.enabled).toBe(true);
+    expect(statusData.always).toBe(false);
+
+    // 4. Sign in again from the SAME IP and UA -> adaptive mode allows sign-in without 2FA challenge
+    const sameDeviceSignIn = await app.request(`${AUTH_PREFIX}/sign-in/email`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        [HEADER.CAPTCHA]: 'pass-token',
+        'x-forwarded-for': '10.0.0.1',
+        'cf-ipcountry': 'VN',
+        'user-agent': 'Chrome-Device-1',
+      },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        password: 'CorrectHorseBatteryStaple!1',
+      }),
+    });
+    expect(sameDeviceSignIn.status).toBe(HTTP_STATUS.OK);
+    const sameDeviceBody = (await sameDeviceSignIn.json()) as {
+      data: { requiresTwoFactor: boolean };
+    };
+    expect(sameDeviceBody.data.requiresTwoFactor).toBe(false);
+
+    // 5. Sign in from a NEW IP (e.g. 198.51.100.99 from JP) -> triggers 2FA challenge
+    const newIpSignIn = await app.request(`${AUTH_PREFIX}/sign-in/email`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        [HEADER.CAPTCHA]: 'pass-token',
+        'x-forwarded-for': '198.51.100.99',
+        'cf-ipcountry': 'JP',
+        'user-agent': 'Chrome-Device-1',
+      },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        password: 'CorrectHorseBatteryStaple!1',
+      }),
+    });
+    expect(newIpSignIn.status).toBe(HTTP_STATUS.OK);
+    const newIpBody = (await newIpSignIn.json()) as {
+      data: { requiresTwoFactor: boolean; reason: string; ip: string; country: string };
+    };
+    expect(newIpBody.data.requiresTwoFactor).toBe(true);
+    expect(newIpBody.data.reason).toBe('new_ip');
+    expect(newIpBody.data.ip).toBe('198.51.100.99');
+    expect(newIpBody.data.country).toBe('JP');
+
+    // 6. Sign in with invalid 2FA code -> 401
+    const invalidTotpRes = await app.request(`${AUTH_PREFIX}/sign-in/email`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': '198.51.100.99',
+        'cf-ipcountry': 'JP',
+        'user-agent': 'Chrome-Device-1',
+      },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        password: 'CorrectHorseBatteryStaple!1',
+        twoFactorCode: '000000',
+      }),
+    });
+    expect(invalidTotpRes.status).toBe(HTTP_STATUS.UNAUTHORIZED);
+
+    // 7. Sign in with valid 2FA code -> succeeds and issues session cookie
+    const validCode2 = await generateTotpCode(setupData.secret);
+    const validTotpRes = await app.request(`${AUTH_PREFIX}/sign-in/email`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': '198.51.100.99',
+        'cf-ipcountry': 'JP',
+        'user-agent': 'Chrome-Device-1',
+      },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        password: 'CorrectHorseBatteryStaple!1',
+        twoFactorCode: validCode2,
+      }),
+    });
+    expect(validTotpRes.status).toBe(HTTP_STATUS.OK);
+    const validTotpCookie = (validTotpRes.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+    expect(validTotpCookie).toContain('better-auth.session_token=');
+
+    // 8. Active sessions management: check sessions list
+    const sessionsRes = await app.request(`${AUTH_PREFIX}/sessions`, {
+      headers: { cookie: validTotpCookie },
+    });
+    expect(sessionsRes.status).toBe(HTTP_STATUS.OK);
+    const sessionsList = (
+      (await sessionsRes.json()) as {
+        data: Array<{ id: string; ipAddress: string; country: string; isCurrent: boolean }>;
+      }
+    ).data;
+    expect(sessionsList.length).toBeGreaterThanOrEqual(2);
+    const currentSession = sessionsList.find((s) => s.isCurrent);
+    expect(currentSession?.ipAddress).toBe('198.51.100.99');
+    expect(currentSession?.country).toBe('JP');
+
+    // 9. Revoke all other sessions
+    const revokeOthersRes = await app.request(`${AUTH_PREFIX}/sessions/revoke-others`, {
+      method: 'POST',
+      headers: { cookie: validTotpCookie },
+    });
+    expect(revokeOthersRes.status).toBe(HTTP_STATUS.OK);
+
+    // Check sessions list again: only current session remains
+    const sessionsRes2 = await app.request(`${AUTH_PREFIX}/sessions`, {
+      headers: { cookie: validTotpCookie },
+    });
+    const sessionsList2 = (
+      (await sessionsRes2.json()) as { data: Array<{ id: string; isCurrent: boolean }> }
+    ).data;
+    expect(sessionsList2.length).toBe(1);
+    expect(sessionsList2[0]?.isCurrent).toBe(true);
   });
 });
