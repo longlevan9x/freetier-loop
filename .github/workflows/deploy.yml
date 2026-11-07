@@ -1,0 +1,65 @@
+name: Deploy to Cloudflare
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify Quality Gates
+        run: |
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+
+      - name: Build Web Frontend
+        env:
+          VITE_API_BASE_URL: /
+          VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA' }}
+        run: pnpm --filter @freetier-loop/web build
+
+      - name: Apply D1 Migrations (Remote)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            pnpm exec wrangler d1 migrations apply freetier-loop-db --remote
+          else
+            echo "Skipping remote migration: CLOUDFLARE_API_TOKEN secret is not set."
+          fi
+
+      - name: Deploy Worker to Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            pnpm exec wrangler deploy
+          else
+            echo "Skipping deploy: CLOUDFLARE_API_TOKEN secret is not set."
+            echo "Please configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in your GitHub Repository Secrets."
+            exit 1
+          fi
