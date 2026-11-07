@@ -29,6 +29,24 @@ import { Button } from '../../../components/ui/button';
 import { queryKeys } from '../../../lib/query-keys';
 import { apiClient } from '../../../lib/rpc';
 
+const formatGitRepo = (gitRepo: unknown): string | null => {
+  if (!gitRepo) return null;
+  if (typeof gitRepo === 'string' && gitRepo.trim()) return gitRepo.trim();
+  if (typeof gitRepo === 'object' && gitRepo !== null) {
+    const record = gitRepo as Record<string, unknown>;
+    if (typeof record.repo === 'string' && record.repo.trim()) {
+      return record.repo.trim();
+    }
+    if (typeof record.name === 'string' && record.name.trim()) {
+      return record.name.trim();
+    }
+    if (typeof record.url === 'string' && record.url.trim()) {
+      return record.url.trim();
+    }
+  }
+  return null;
+};
+
 export const ProjectsView = () => {
   const queryClient = useQueryClient();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -429,17 +447,21 @@ export const ProjectsView = () => {
                                   </span>
                                 ) : (
                                   <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400">
-                                    {String(proj.data.framework ?? 'custom')}
+                                    {typeof proj.data.framework === 'string' && proj.data.framework
+                                      ? proj.data.framework
+                                      : 'custom'}
                                   </span>
                                 )}
                               </div>
 
                               <div className="mt-0.5 text-[11px] text-zinc-500">
                                 Ref: {proj.externalId}
-                                {!isVercel
-                                  ? ` · Vùng: ${String(proj.data.region ?? 'default')}`
+                                {!isVercel && proj.data.region
+                                  ? ` · Vùng: ${String(proj.data.region)}`
                                   : ''}
-                                {proj.data.gitRepo ? ` · Repo: ${String(proj.data.gitRepo)}` : ''}
+                                {formatGitRepo(proj.data.gitRepo)
+                                  ? ` · Repo: ${formatGitRepo(proj.data.gitRepo)}`
+                                  : ''}
                               </div>
                             </button>
 
