@@ -3,6 +3,7 @@ NODE_ENV=development
 BETTER_AUTH_URL=http://localhost:8787
 # Generate with: openssl rand -base64 32
 BETTER_AUTH_SECRET=<REPLACE_WITH_MIN_32_CHAR_SECRET>
+#admin email allow null
 ADMIN_EMAILS=admin@example.com
 # Cloudflare Turnstile secret key (for local dev you can use Cloudflare's official test secret key from Turnstile docs)
 TURNSTILE_SECRET_KEY=<REPLACE_WITH_TURNSTILE_SECRET_KEY>
