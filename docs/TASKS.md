@@ -206,7 +206,7 @@
 
 - [x] **T-130 Cron sync usage định kỳ** — `scheduled()` handler tự cập nhật `usage_snapshots` và trạng thái cảnh báo trong dashboard (không gửi thông báo ra kênh ngoài).
 - [ ] **T-131 `CF_WORKER_MOVE` / `CF_PAGES_MOVE`** — upload script + bindings, secrets manual, routes/custom domains.
-- [ ] **T-132 Bắt buộc 2FA (TOTP) + trang Sessions** — plugin `twoFactor`, revoke sessions.
+- [x] **T-132 Bắt buộc 2FA (TOTP) + trang Sessions** — plugin `twoFactor`, revoke sessions.
 - [x] **T-133 Gợi ý account đích** — chọn account còn nhiều quota/slot nhất cho migration.
 - [ ] **T-134 Data migration D1/KV/R2 & Supabase Storage** — export/import có chunk.
 - [ ] **T-135 Thêm provider** (Netlify/Render/Neon/Upstash) — chỉ thêm adapter + registry.
