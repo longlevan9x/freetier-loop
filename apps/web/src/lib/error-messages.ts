@@ -13,6 +13,10 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
     'Cloudflare Turnstile verification failed. Please complete the challenge again.',
   [ERROR_CODE.AUTH_RATE_LIMITED]:
     'Too many sign-in attempts. Please wait 60 seconds before retrying.',
+  [ERROR_CODE.AUTH_2FA_REQUIRED]:
+    'Two-factor authentication code required. Please enter your 6-digit TOTP code.',
+  [ERROR_CODE.AUTH_INVALID_2FA]:
+    'Invalid or expired 2FA code. Please check your authenticator app and try again.',
   [ERROR_CODE.PROVIDER_AUTH_INVALID]:
     'Provider API token is invalid or expired. Check permissions and try again.',
   [ERROR_CODE.PROVIDER_PERMISSION_MISSING]: 'Provider API token is missing required scopes.',

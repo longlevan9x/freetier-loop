@@ -8,6 +8,13 @@
       "when": 1794040656373,
       "tag": "0000_faithful_imperial_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1794053458140,
+      "tag": "0001_worried_dragon_lord",
+      "breakpoints": true
     }
   ]
 }
