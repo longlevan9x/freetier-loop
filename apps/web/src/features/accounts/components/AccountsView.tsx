@@ -13,6 +13,13 @@ import { CheckCircle2, Cloud, KeyRound, Plus, RefreshCw, Trash2 } from 'lucide-r
 import { type FormEvent, useState } from 'react';
 import { BentoCard } from '../../../components/bento/BentoCard';
 import { BentoGrid } from '../../../components/bento/BentoGrid';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 import { formatApiError } from '../../../lib/error-messages';
 import { queryKeys } from '../../../lib/query-keys';
 import { apiClient } from '../../../lib/rpc';
@@ -150,18 +157,20 @@ export const AccountsView = () => {
               <label htmlFor="acc-provider" className="block text-xs font-medium text-zinc-400">
                 Provider
               </label>
-              <select
-                id="acc-provider"
-                value={provider}
-                onChange={(e) => setProvider(e.target.value as Provider)}
-                className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-              >
-                {PROVIDER_VALUES.map((p) => (
-                  <option key={p} value={p}>
-                    {PROVIDER_LABEL[p]}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <Select value={provider} onValueChange={(val) => setProvider(val as Provider)}>
+                  <SelectTrigger id="acc-provider">
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROVIDER_VALUES.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {PROVIDER_LABEL[p]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div>

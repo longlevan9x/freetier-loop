@@ -21,6 +21,13 @@ import {
 import { useState } from 'react';
 import { BentoCard } from '../../../components/bento/BentoCard';
 import { BentoGrid } from '../../../components/bento/BentoGrid';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
 import { formatApiError } from '../../../lib/error-messages';
 import { queryKeys } from '../../../lib/query-keys';
 import { apiClient } from '../../../lib/rpc';
@@ -248,80 +255,91 @@ export const MigrationsView = () => {
               <label htmlFor="mig-source" className="block text-xs font-medium text-zinc-400">
                 1. Source Account
               </label>
-              <select
-                id="mig-source"
-                value={sourceAccountId}
-                onChange={(e) => {
-                  setSourceAccountId(e.target.value);
-                  setResourceId('');
-                }}
-                className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-              >
-                <option value="">Select source account…</option>
-                {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.label} ({acc.provider})
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <Select
+                  value={sourceAccountId}
+                  onValueChange={(val) => {
+                    setSourceAccountId(val);
+                    setResourceId('');
+                  }}
+                >
+                  <SelectTrigger id="mig-source">
+                    <SelectValue placeholder="Select source account…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((acc) => (
+                      <SelectItem key={acc.id} value={acc.id}>
+                        {acc.label} ({acc.provider})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div>
               <label htmlFor="mig-resource" className="block text-xs font-medium text-zinc-400">
                 2. Resource to Migrate
               </label>
-              <select
-                id="mig-resource"
-                value={resourceId}
-                onChange={(e) => setResourceId(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-              >
-                <option value="">Select resource…</option>
-                {resources.map((res) => (
-                  <option key={res.id} value={res.id}>
-                    {res.name} ({res.kind})
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <Select value={resourceId} onValueChange={(val) => setResourceId(val)}>
+                  <SelectTrigger id="mig-resource">
+                    <SelectValue placeholder="Select resource…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {resources.map((res) => (
+                      <SelectItem key={res.id} value={res.id}>
+                        {res.name} ({res.kind})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div>
               <label htmlFor="mig-target" className="block text-xs font-medium text-zinc-400">
                 3. Target Account
               </label>
-              <select
-                id="mig-target"
-                value={targetAccountId}
-                onChange={(e) => setTargetAccountId(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-              >
-                <option value="">Select target account…</option>
-                {accounts
-                  .filter((a) => a.id !== sourceAccountId)
-                  .map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.label} ({acc.provider})
-                    </option>
-                  ))}
-              </select>
+              <div className="mt-1">
+                <Select value={targetAccountId} onValueChange={(val) => setTargetAccountId(val)}>
+                  <SelectTrigger id="mig-target">
+                    <SelectValue placeholder="Select target account…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts
+                      .filter((a) => a.id !== sourceAccountId)
+                      .map((acc) => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          {acc.label} ({acc.provider})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div>
               <label htmlFor="mig-template" className="block text-xs font-medium text-zinc-400">
                 4. Migration Template
               </label>
-              <select
-                id="mig-template"
-                value={template}
-                onChange={(e) => setTemplate(e.target.value as MigrationTemplate)}
-                className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
-              >
-                {MIGRATION_TEMPLATE_VALUES.map((tpl) => (
-                  <option key={tpl} value={tpl}>
-                    {MIGRATION_TEMPLATE_LABEL[tpl]}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <Select
+                  value={template}
+                  onValueChange={(val) => setTemplate(val as MigrationTemplate)}
+                >
+                  <SelectTrigger id="mig-template">
+                    <SelectValue placeholder="Select template…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MIGRATION_TEMPLATE_VALUES.map((tpl) => (
+                      <SelectItem key={tpl} value={tpl}>
+                        {MIGRATION_TEMPLATE_LABEL[tpl]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
