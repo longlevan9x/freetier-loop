@@ -13,7 +13,8 @@ import {
   Smartphone,
   Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import QRCode from 'qrcode';
+import { useEffect, useState } from 'react';
 import { BentoCard } from '../../../components/bento/BentoCard';
 import { BentoGrid } from '../../../components/bento/BentoGrid';
 import { Button } from '../../../components/ui/button';
@@ -64,12 +65,30 @@ export const SettingsView = () => {
 
   // 2FA state & queries
   const [setupData, setSetupData] = useState<{ secret: string; otpauthUri: string } | null>(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [verifyCode, setVerifyCode] = useState('');
   const [alwaysRequired, setAlwaysRequired] = useState(false);
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [twoFactorError, setTwoFactorError] = useState<string | null>(null);
   const [showDisableForm, setShowDisableForm] = useState(false);
   const [disablePassword, setDisablePassword] = useState('');
+
+  useEffect(() => {
+    if (setupData?.otpauthUri) {
+      QRCode.toDataURL(setupData.otpauthUri, {
+        margin: 1,
+        width: 140,
+        color: {
+          dark: '#000000',
+          light: '#ffffff',
+        },
+      })
+        .then(setQrCodeDataUrl)
+        .catch(() => setQrCodeDataUrl(null));
+    } else {
+      setQrCodeDataUrl(null);
+    }
+  }, [setupData?.otpauthUri]);
 
   const twoFactorQuery = useQuery({
     queryKey: queryKeys.auth.twoFactorStatus,
@@ -273,25 +292,51 @@ export const SettingsView = () => {
                 )}
               </div>
             ) : setupData ? (
-              <div className="space-y-3 rounded-xl border border-emerald-500/20 bg-zinc-950/70 p-3.5 text-xs">
-                <div className="space-y-1">
-                  <span className="font-semibold text-zinc-200">1. Khóa bí mật (Secret Key):</span>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 font-mono text-xs text-emerald-400 break-all select-all">
-                      {setupData.secret}
-                    </code>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => handleCopySecret(setupData.secret)}
-                      className="h-8 px-2.5 text-xs shrink-0"
-                    >
-                      {copiedSecret ? (
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
+              <div className="space-y-3.5 rounded-xl border border-emerald-500/20 bg-zinc-950/70 p-3.5 text-xs">
+                <div className="flex flex-col sm:flex-row items-center gap-3.5 rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
+                  {qrCodeDataUrl ? (
+                    <div className="rounded-lg bg-white p-1.5 shadow-sm shrink-0">
+                      <img
+                        src={qrCodeDataUrl}
+                        alt="Scan QR code with Authenticator app"
+                        className="h-28 w-28 object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex h-28 w-28 items-center justify-center rounded-lg bg-zinc-800 text-zinc-500 text-[11px] shrink-0">
+                      Đang tạo QR...
+                    </div>
+                  )}
+                  <div className="space-y-2 flex-1 text-xs">
+                    <span className="font-semibold text-zinc-200 block">
+                      1. Quét mã QR bằng App Authenticator:
+                    </span>
+                    <p className="text-zinc-400 text-[11px] leading-relaxed">
+                      Mở Google Authenticator, Authy, hoặc ứng dụng bảo mật trên điện thoại để quét
+                      mã bên cạnh.
+                    </p>
+                    <div className="pt-1">
+                      <span className="text-[11px] text-zinc-400 block mb-1">
+                        Hoặc nhập thủ công khóa bí mật (Secret Key):
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <code className="flex-1 rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 font-mono text-[11px] text-emerald-400 break-all select-all">
+                          {setupData.secret}
+                        </code>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => handleCopySecret(setupData.secret)}
+                          className="h-7 px-2 text-xs shrink-0"
+                        >
+                          {copiedSecret ? (
+                            <Check className="h-3 w-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

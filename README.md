@@ -3,6 +3,7 @@
 Single-admin control plane to monitor quotas and safely migrate domains, DNS zones, projects, databases, and environment configurations across multiple **Cloudflare**, **Vercel**, and **Supabase** accounts.
 
 - **Architecture & Plan:** [`docs/PLAN.md`](./docs/PLAN.md)
+- **Deployment Guide:** [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md)
 - **Provider Research:** [`docs/RESEARCH.md`](./docs/RESEARCH.md)
 - **Task Tracker:** [`docs/TASKS.md`](./docs/TASKS.md)
 - **Agent Rules:** [`AGENTS.md`](./AGENTS.md) & [`.agents/rules/`](./.agents/rules/)
@@ -82,16 +83,28 @@ Cập nhật các biến công khai trong `wrangler.jsonc` (`vars`):
 
 #### Bước 3: Chạy Migration & Tạo tài khoản Admin trên D1 Remote
 ```bash
-pnpm db:generate
 pnpm db:migrate:remote
-pnpm db:seed:admin --email ban@gmail.com --password "MatKhauManhTren12KyTu!" --remote
+pnpm db:seed:admin -- --email ban@gmail.com --password "MatKhauManhTren12KyTu!" --remote
 ```
 
-#### Bước 4: Build & Deploy toàn bộ Web + API bằng 1 lệnh
+#### Bước 4: Deploy lên Cloudflare
+
+**Cách A: Deploy tự động bằng GitHub Actions (Khuyên dùng)**
+File workflow [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml) đã được cấu hình sẵn. Bạn chỉ cần:
+1. Vào Cloudflare Dashboard lấy **Account ID** và tạo **API Token** (template *Edit Cloudflare Workers*).
+2. Vào GitHub Repo > **Settings** > **Secrets and variables** > **Actions** thêm 3 secrets:
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+   - `VITE_TURNSTILE_SITE_KEY`
+3. Mỗi khi push code lên nhánh `main`, GitHub Actions sẽ tự động kiểm tra test, build và deploy lên Cloudflare.
+
+**Cách B: Deploy thủ công từ máy tính (Local CLI)**
 ```bash
 pnpm deploy
 ```
 *(Lệnh `pnpm deploy` sẽ tự động chạy `vite build` tạo ra `apps/web/dist`, sau đó `wrangler deploy` đẩy cả giao diện tĩnh lẫn Hono API Worker lên Cloudflare).*
+
+> Xem hướng dẫn chi tiết từng bước tại: [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md)
 
 ---
 
