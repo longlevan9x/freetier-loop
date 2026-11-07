@@ -10,9 +10,8 @@ export type WebEnv = Readonly<z.infer<typeof webEnvSchema>>;
 export const parseWebEnv = (raw: Record<string, unknown> = {}): WebEnv =>
   Object.freeze(webEnvSchema.parse(raw));
 
-const rawImportMetaEnv =
-  typeof import.meta !== 'undefined' && 'env' in import.meta
-    ? (import.meta as unknown as { env: Record<string, unknown> }).env
-    : {};
-
-export const webEnv = parseWebEnv(rawImportMetaEnv);
+// Access import.meta.env statically so Vite replaces them at build time
+export const webEnv: WebEnv = parseWebEnv({
+  VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL || '/',
+  VITE_TURNSTILE_SITE_KEY: import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA',
+});
