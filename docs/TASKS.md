@@ -82,7 +82,7 @@
 
 ## M2 — Provider accounts & Inventory
 
-- [ ] **T-040 Schema domain tables** (M) — Deps: T-004
+- [x] **T-040 Schema domain tables** (M) — Deps: T-004
   `provider_accounts`, `resources`, `usage_snapshots`, `jobs`, `job_steps`, `job_events`, `snapshots`, `audit_logs`, `login_attempts` + index.
   AC: migration apply local OK; types inferred export cho repositories.
 - [ ] **T-041 HTTP client dùng chung cho provider** (M) — Deps: T-005

@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "pnpm --parallel --filter @freetier-loop/api --filter @freetier-loop/web dev",
     "build": "pnpm -r build",
+    "deploy": "pnpm --filter @freetier-loop/web build && wrangler deploy",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
