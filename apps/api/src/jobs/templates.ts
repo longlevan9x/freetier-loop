@@ -303,4 +303,39 @@ export const MIGRATION_TEMPLATE_CATALOG: Record<MigrationTemplate, TemplateCatal
       STEP_TYPE.ENV_REWIRE_VARS,
     ]),
   },
+
+  [MIGRATION_TEMPLATE.VERCEL_GITLAB_CUTOVER]: {
+    template: MIGRATION_TEMPLATE.VERCEL_GITLAB_CUTOVER,
+    label: MIGRATION_TEMPLATE_LABEL[MIGRATION_TEMPLATE.VERCEL_GITLAB_CUTOVER],
+    provider: PROVIDER.VERCEL,
+    supportedResourceKinds: [RESOURCE_KIND.VERCEL_PROJECT, RESOURCE_KIND.PROJECT_DOMAIN],
+    description:
+      '3-in-1 Full Cutover: Moves custom domains, syncs Vercel rules (rewrites, redirects, headers), and auto-rewires GitLab CI/CD variables (VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID) in a single workflow.',
+    destructive: true,
+    manualSteps: [],
+    warnings: [
+      'GitLab pipeline variables will be updated to point to the target Vercel account.',
+      'Ensure GitLab Personal/Project Access Token has api permission.',
+    ],
+    inputSchema: {
+      type: 'object',
+      properties: {
+        gitlabProjectId: {
+          type: 'string',
+          description: 'GitLab Project ID or path (e.g. 123456 or group/repo)',
+        },
+        gitlabToken: {
+          type: 'string',
+          description: 'GitLab Personal Access Token with api scope',
+        },
+      },
+    },
+    defaultSteps: toStepSummaries([
+      STEP_TYPE.PREFLIGHT_VERIFY_ACCOUNTS,
+      STEP_TYPE.SNAPSHOT_RESOURCE,
+      STEP_TYPE.VERCEL_MOVE_DOMAINS,
+      STEP_TYPE.VERCEL_SYNC_RULES,
+      STEP_TYPE.GITLAB_REWIRE_VARS,
+    ]),
+  },
 };

@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   ERROR_CODE,
   HTTP_STATUS,
@@ -11,8 +11,13 @@ import { AppError, errResult, newId, okResult } from '../lib/index';
 import { createProviderAccountSchema, ok } from '../schemas/index';
 
 describe('@freetier-loop/shared', () => {
-  it('exposes provider constants including cloudflare, vercel, and supabase', () => {
-    expect(PROVIDER_VALUES).toEqual([PROVIDER.CLOUDFLARE, PROVIDER.VERCEL, PROVIDER.SUPABASE]);
+  it('exposes provider constants including cloudflare, vercel, supabase, and gitlab', () => {
+    expect(PROVIDER_VALUES).toEqual([
+      PROVIDER.CLOUDFLARE,
+      PROVIDER.VERCEL,
+      PROVIDER.SUPABASE,
+      PROVIDER.GITLAB,
+    ]);
   });
 
   it('includes CF_REGISTRAR_DOMAIN_MOVE and SUPABASE templates', () => {

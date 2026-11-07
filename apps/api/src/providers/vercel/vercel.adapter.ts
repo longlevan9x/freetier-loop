@@ -15,6 +15,7 @@ import type {
   NormalizedProjectDomain,
   ProjectDomainProvider,
   ProjectProvider,
+  ProjectRules,
   ProviderAdapter,
   ProviderContext,
   UsageMetricSnapshot,
@@ -236,6 +237,48 @@ export class VercelAdapter
     });
 
     return { transferred: true, code: reqRes.code };
+  }
+
+  async getProjectRules(ctx: ProviderContext, projectId: string): Promise<ProjectRules> {
+    const http = this.client(ctx);
+    const p = await http.request<{
+      rewrites?: Array<{ source: string; destination: string }>;
+      redirects?: Array<{ source: string; destination: string; permanent?: boolean }>;
+      headers?: Array<{ source: string; headers: Array<{ key: string; value: string }> }>;
+      cleanUrls?: boolean;
+      trailingSlash?: boolean;
+    }>({
+      path: VERCEL_ENDPOINTS.PROJECT_DETAIL(projectId),
+      query: this.teamQuery(ctx),
+    });
+
+    return {
+      rewrites: p.rewrites ?? [],
+      redirects: p.redirects ?? [],
+      headers: p.headers ?? [],
+      cleanUrls: p.cleanUrls ?? false,
+      trailingSlash: p.trailingSlash ?? false,
+    };
+  }
+
+  async updateProjectRules(
+    ctx: ProviderContext,
+    projectId: string,
+    rules: ProjectRules,
+  ): Promise<void> {
+    const http = this.client(ctx);
+    await http.request({
+      method: 'PATCH',
+      path: VERCEL_ENDPOINTS.PROJECT_DETAIL(projectId),
+      query: this.teamQuery(ctx),
+      body: {
+        ...(rules.rewrites !== undefined ? { rewrites: rules.rewrites } : {}),
+        ...(rules.redirects !== undefined ? { redirects: rules.redirects } : {}),
+        ...(rules.headers !== undefined ? { headers: rules.headers } : {}),
+        ...(rules.cleanUrls !== undefined ? { cleanUrls: rules.cleanUrls } : {}),
+        ...(rules.trailingSlash !== undefined ? { trailingSlash: rules.trailingSlash } : {}),
+      },
+    });
   }
 
   async listProjectDomains(

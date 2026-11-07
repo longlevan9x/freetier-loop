@@ -41,6 +41,8 @@ const TOKEN_SCOPE_GUIDE: Record<Provider, string> = {
     'Create a Full-Account Token at vercel.com/account/tokens (supports Hobby & Team accounts)',
   [PROVIDER.SUPABASE]:
     'Create a Personal Access Token (PAT) at supabase.com/dashboard/account/tokens',
+  [PROVIDER.GITLAB]:
+    'Create a Personal Access Token (PAT) with "api" scope at gitlab.com/-/user_settings/personal_access_tokens',
 };
 
 export const AccountsView = () => {

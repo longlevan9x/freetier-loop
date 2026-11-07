@@ -193,4 +193,130 @@ describe('Providers & HTTP Client (T-041..T-045B)', () => {
     expect(usage[0]?.value).toBe(2);
     expect(usage[0]?.warning).toContain('slot full');
   });
+
+  it('VercelAdapter reads and updates project rules (rewrites, redirects, headers)', async () => {
+    const registry = createDefaultProviderRegistry();
+    let patchedBody: Record<string, unknown> | null = null;
+    const fetchFn: typeof fetch = async (input, init) => {
+      const url = String(input);
+      if (url.includes('/v9/projects/prj_123')) {
+        if (init?.method === 'PATCH') {
+          patchedBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+          return jsonResponse({ id: 'prj_123', ...patchedBody });
+        }
+        return jsonResponse({
+          id: 'prj_123',
+          name: 'my-project',
+          rewrites: [{ source: '/api/(.*)', destination: '/api/v1/$1' }],
+          redirects: [{ source: '/old', destination: '/new', permanent: true }],
+          headers: [{ source: '/(.*)', headers: [{ key: 'X-Frame-Options', value: 'DENY' }] }],
+          cleanUrls: true,
+          trailingSlash: false,
+        });
+      }
+      return jsonResponse({});
+    };
+
+    const ctx = { token: 'ver_tok', fetchFn };
+    const projectProvider = registry.getCapability(PROVIDER.VERCEL, CAPABILITY.PROJECTS);
+    const rules = await projectProvider.getProjectRules!(ctx, 'prj_123');
+    expect(rules.rewrites).toHaveLength(1);
+    expect(rules.redirects).toHaveLength(1);
+    expect(rules.headers).toHaveLength(1);
+    expect(rules.cleanUrls).toBe(true);
+
+    await projectProvider.updateProjectRules!(ctx, 'prj_123', {
+      ...rules,
+      cleanUrls: false,
+    });
+    expect(patchedBody).toMatchObject({ cleanUrls: false });
+  });
+
+  it('GitLabAdapter verifies token, lists projects, reads variables and upserts variable', async () => {
+    const registry = createDefaultProviderRegistry();
+    const variablesStore: Record<string, string> = {
+      VERCEL_TOKEN: 'old_ver_token',
+      VERCEL_ORG_ID: 'old_org_id',
+    };
+
+    const fetchFn: typeof fetch = async (input, init) => {
+      const url = String(input);
+      if (url.includes('/personal_access_tokens/self')) {
+        return jsonResponse({
+          id: 1,
+          name: 'dev-user',
+          user_id: 9999,
+          active: true,
+          revoked: false,
+          scopes: ['api'],
+        });
+      }
+      if (url.includes('/api/v4/user')) {
+        return jsonResponse({ id: 9999, username: 'dev-user', name: 'Dev User', state: 'active' });
+      }
+      if (url.includes('/api/v4/projects/123/variables/VERCEL_TOKEN')) {
+        if (init?.method === 'PUT') {
+          const body = JSON.parse(String(init.body)) as { value: string };
+          variablesStore.VERCEL_TOKEN = body.value;
+          return jsonResponse({ key: 'VERCEL_TOKEN', value: body.value });
+        }
+        return jsonResponse({ key: 'VERCEL_TOKEN', value: variablesStore.VERCEL_TOKEN });
+      }
+      if (url.includes('/api/v4/projects/123/variables/VERCEL_PROJECT_ID')) {
+        return jsonResponse({ message: '404 Variable Not Found' }, 404);
+      }
+      if (url.includes('/api/v4/projects/123/variables')) {
+        if (init?.method === 'POST') {
+          const body = JSON.parse(String(init.body)) as { key: string; value: string };
+          variablesStore[body.key] = body.value;
+          return jsonResponse({ key: body.key, value: body.value }, 201);
+        }
+        return jsonResponse(
+          Object.entries(variablesStore).map(([key, value]) => ({
+            key,
+            value,
+            variable_type: 'env_var',
+            protected: false,
+            masked: key.includes('TOKEN'),
+          })),
+        );
+      }
+      if (url.includes('/api/v4/projects')) {
+        return jsonResponse([
+          {
+            id: 123,
+            name: 'frontend-app',
+            path_with_namespace: 'team/frontend-app',
+            web_url: 'https://gitlab.com/team/frontend-app',
+            default_branch: 'main',
+          },
+        ]);
+      }
+      return jsonResponse({});
+    };
+
+    const ctx = { token: 'glpat_test123', fetchFn };
+    const verifier = registry.getCapability(PROVIDER.GITLAB, CAPABILITY.ACCOUNT_VERIFIER);
+    const verified = await verifier.verify(ctx);
+    expect(verified.valid).toBe(true);
+    expect(verified.externalAccountId).toBe('9999');
+    expect(verified.labelSuggested).toBe('dev-user');
+
+    const gitlab = registry.getCapability(PROVIDER.GITLAB, CAPABILITY.GITLAB_VARIABLES);
+    const projects = await gitlab.listProjects(ctx);
+    expect(projects).toHaveLength(1);
+    expect(projects[0]?.name).toBe('frontend-app');
+
+    const vars = await gitlab.listVariables(ctx, 123);
+    expect(vars).toHaveLength(2);
+    expect(vars.find((v) => v.key === 'VERCEL_TOKEN')?.value).toBe('old_ver_token');
+
+    // Update existing
+    await gitlab.upsertVariable(ctx, 123, { key: 'VERCEL_TOKEN', value: 'new_ver_token' });
+    expect(variablesStore.VERCEL_TOKEN).toBe('new_ver_token');
+
+    // Create new
+    await gitlab.upsertVariable(ctx, 123, { key: 'VERCEL_PROJECT_ID', value: 'prj_new_id' });
+    expect(variablesStore.VERCEL_PROJECT_ID).toBe('prj_new_id');
+  });
 });

@@ -392,6 +392,60 @@ export class ProviderAccountsService {
           }
         }
       }
+    } else if (decryptable.provider === PROVIDER.GITLAB) {
+      const gitlabProvider = this.registry.getCapability(
+        PROVIDER.GITLAB,
+        CAPABILITY.GITLAB_VARIABLES,
+      );
+      try {
+        const projects = await gitlabProvider.listProjects(ctx);
+        for (const proj of projects) {
+          const projResource = await this.resourcesRepo.upsert({
+            providerAccountId: id,
+            kind: RESOURCE_KIND.GITLAB_PROJECT,
+            externalId: String(proj.id),
+            name: proj.pathWithNamespace || proj.name,
+            data: {
+              id: proj.id,
+              name: proj.name,
+              pathWithNamespace: proj.pathWithNamespace,
+              webUrl: proj.webUrl,
+              defaultBranch: proj.defaultBranch,
+            },
+            nowMs,
+          });
+          syncedCount++;
+
+          if (budget.remaining >= 2) {
+            try {
+              const vars = await gitlabProvider.listVariables(ctx, proj.id);
+              for (const v of vars) {
+                await this.resourcesRepo.upsert({
+                  providerAccountId: id,
+                  kind: RESOURCE_KIND.ENV_VAR,
+                  externalId: `${proj.id}:${v.key}`,
+                  name: v.key,
+                  parentId: projResource.id,
+                  data: {
+                    type: v.variable_type ?? 'env_var',
+                    masked: v.masked,
+                    protected: v.protected,
+                  },
+                  nowMs,
+                });
+                syncedCount++;
+              }
+            } catch {
+              // Ignore if variable listing is forbidden on specific project
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(
+          'GitLab project sync skipped:',
+          err instanceof Error ? err.message : String(err),
+        );
+      }
     }
 
     await this.repo.update(id, { lastSyncedAt: nowMs }, nowMs);

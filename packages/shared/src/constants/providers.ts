@@ -2,6 +2,7 @@ export const PROVIDER = {
   CLOUDFLARE: 'cloudflare',
   VERCEL: 'vercel',
   SUPABASE: 'supabase',
+  GITLAB: 'gitlab',
 } as const;
 
 export type Provider = (typeof PROVIDER)[keyof typeof PROVIDER];
@@ -11,6 +12,7 @@ export const PROVIDER_LABEL: Record<Provider, string> = {
   [PROVIDER.CLOUDFLARE]: 'Cloudflare',
   [PROVIDER.VERCEL]: 'Vercel',
   [PROVIDER.SUPABASE]: 'Supabase',
+  [PROVIDER.GITLAB]: 'GitLab',
 };
 
 export const ACCOUNT_STATUS = {
@@ -48,6 +50,7 @@ export const CAPABILITY = {
   EDGE_FUNCTIONS: 'edge_functions',
   SQL_QUERY: 'sql_query',
   USAGE: 'usage',
+  GITLAB_VARIABLES: 'gitlab_variables',
 } as const;
 
 export type Capability = (typeof CAPABILITY)[keyof typeof CAPABILITY];

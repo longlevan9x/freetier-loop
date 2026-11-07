@@ -48,6 +48,8 @@ export const STEP_TYPE = {
   SUPABASE_PAUSE_SOURCE: 'supabase.pause-source',
   DNS_REPOINT_RECORDS: 'dns.repoint-records',
   ENV_REWIRE_VARS: 'env.rewire-vars',
+  VERCEL_SYNC_RULES: 'vercel.sync-rules',
+  GITLAB_REWIRE_VARS: 'gitlab.rewire-vars',
 } as const;
 
 export type StepType = (typeof STEP_TYPE)[keyof typeof STEP_TYPE];

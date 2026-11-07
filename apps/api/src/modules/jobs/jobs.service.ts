@@ -180,22 +180,42 @@ export class JobsService {
     const now = new Date();
     const jobId = newId(ID_PREFIX.JOB);
 
-    const stepInserts = templateCatalog.defaultSteps.map((s, index) => ({
-      id: newId(ID_PREFIX.JOB_STEP),
-      jobId,
-      position: index,
-      type: s.type,
-      title: s.title,
-      destructive: s.destructive,
-      status: STEP_STATUS.PENDING,
-      cursor: null,
-      result: null,
-      errorCode: null,
-      errorMessage: null,
-      attempts: 0,
-      createdAt: now,
-      updatedAt: now,
-    }));
+    const customStepTypes = (input.input as Record<string, unknown> | undefined)?.customStepTypes as
+      | StepType[]
+      | undefined;
+
+    let stepTypesToRun: StepType[];
+    if (customStepTypes && Array.isArray(customStepTypes) && customStepTypes.length > 0) {
+      stepTypesToRun = [
+        STEP_TYPE.PREFLIGHT_VERIFY_ACCOUNTS,
+        STEP_TYPE.SNAPSHOT_RESOURCE,
+        ...customStepTypes.filter(
+          (t) => t !== STEP_TYPE.PREFLIGHT_VERIFY_ACCOUNTS && t !== STEP_TYPE.SNAPSHOT_RESOURCE,
+        ),
+      ];
+    } else {
+      stepTypesToRun = templateCatalog.defaultSteps.map((s) => s.type);
+    }
+
+    const stepInserts = stepTypesToRun.map((type, index) => {
+      const def = STEP_REGISTRY[type];
+      return {
+        id: newId(ID_PREFIX.JOB_STEP),
+        jobId,
+        position: index,
+        type,
+        title: def ? def.title : type,
+        destructive: def ? def.destructive : false,
+        status: STEP_STATUS.PENDING,
+        cursor: null,
+        result: null,
+        errorCode: null,
+        errorMessage: null,
+        attempts: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
 
     const created = await this.repo.createJob(
       {

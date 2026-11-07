@@ -3,10 +3,17 @@ import {
   ERROR_CODE,
   JOB_EVENT_LEVEL,
   MIGRATION_TEMPLATE,
+  PROVIDER,
   STEP_STATUS,
   VERCEL_ACCOUNT_TYPE,
 } from '@freetier-loop/shared';
-import type { NormalizedDnsRecord, NormalizedEnvVar } from '../providers/contracts';
+import type {
+  GitLabVariable,
+  NormalizedDnsRecord,
+  NormalizedEnvVar,
+  ProjectRules,
+  ProviderContext,
+} from '../providers/contracts';
 import {
   STEP_TYPE,
   type StepContext,
@@ -1431,6 +1438,224 @@ const envRewireVarsStep: StepDefinition = {
   },
 };
 
+const vercelSyncRulesStep: StepDefinition = {
+  type: STEP_TYPE.VERCEL_SYNC_RULES,
+  title: 'Clone Vercel Project Rules (Rewrites, Redirects, Headers)',
+  destructive: false,
+  async plan(ctx): Promise<StepPlan> {
+    return {
+      type: STEP_TYPE.VERCEL_SYNC_RULES,
+      title: this.title,
+      summary: `Clone rewrites, redirects, headers, and routing rules from source to target Vercel project "${ctx.resource.name}".`,
+      destructive: false,
+    };
+  },
+  async execute(ctx): Promise<StepResult> {
+    const createResult = getPriorStepResult(ctx, STEP_TYPE.VERCEL_CREATE_PROJECT);
+    const targetProjectId =
+      (createResult?.targetProjectId as string | undefined) ?? ctx.resource.externalId;
+
+    const sourceProjects = ctx.providerRegistry.getCapability(
+      ctx.sourceAccount.provider,
+      CAPABILITY.PROJECTS,
+    );
+    const targetProjects = ctx.providerRegistry.getCapability(
+      ctx.targetAccount.provider,
+      CAPABILITY.PROJECTS,
+    );
+
+    let sourceRules: ProjectRules = {};
+    if (sourceProjects.getProjectRules) {
+      sourceRules = await sourceProjects.getProjectRules(ctx.sourceCtx, ctx.resource.externalId);
+    }
+
+    let previousTargetRules: ProjectRules = {};
+    if (targetProjects.getProjectRules) {
+      try {
+        previousTargetRules = await targetProjects.getProjectRules(ctx.targetCtx, targetProjectId);
+      } catch {
+        // target might not have existing rules
+      }
+    }
+
+    if (targetProjects.updateProjectRules) {
+      await targetProjects.updateProjectRules(ctx.targetCtx, targetProjectId, sourceRules);
+    }
+
+    const rewritesCount = sourceRules.rewrites?.length ?? 0;
+    const redirectsCount = sourceRules.redirects?.length ?? 0;
+    const headersCount = sourceRules.headers?.length ?? 0;
+
+    await ctx.log(
+      JOB_EVENT_LEVEL.INFO,
+      `Synced Vercel rules to target project ${targetProjectId}: ${rewritesCount} rewrite(s), ${redirectsCount} redirect(s), ${headersCount} header rule(s).`,
+    );
+
+    return {
+      status: STEP_STATUS.SUCCEEDED,
+      result: {
+        targetProjectId,
+        syncedRules: sourceRules,
+        previousTargetRules,
+      },
+    };
+  },
+  async compensate(ctx): Promise<void> {
+    const res = ctx.step.result ?? {};
+    const targetProjectId = (res.targetProjectId as string | undefined) ?? ctx.resource.externalId;
+    const previousRules = res.previousTargetRules as ProjectRules | undefined;
+    if (!previousRules) return;
+
+    const targetProjects = ctx.providerRegistry.getCapability(
+      ctx.targetAccount.provider,
+      CAPABILITY.PROJECTS,
+    );
+    if (targetProjects.updateProjectRules) {
+      await targetProjects.updateProjectRules(ctx.targetCtx, targetProjectId, previousRules);
+      await ctx.log(
+        JOB_EVENT_LEVEL.WARN,
+        `Compensated: restored previous Vercel rules on project ${targetProjectId}.`,
+      );
+    }
+  },
+};
+
+const gitlabRewireVarsStep: StepDefinition = {
+  type: STEP_TYPE.GITLAB_REWIRE_VARS,
+  title: 'Update GitLab CI/CD Project Variables (Token, Team ID, Project ID)',
+  destructive: false,
+  async plan(ctx): Promise<StepPlan> {
+    const input = (ctx.job.input as Record<string, unknown> | undefined) ?? {};
+    const gitlabProjectId = (input.gitlabProjectId as string | undefined) ?? 'configured project';
+    return {
+      type: STEP_TYPE.GITLAB_REWIRE_VARS,
+      title: this.title,
+      summary: `Update VERCEL_TOKEN, VERCEL_ORG_ID/TEAM_ID, and VERCEL_PROJECT_ID on GitLab project ${gitlabProjectId}.`,
+      destructive: false,
+    };
+  },
+  async execute(ctx): Promise<StepResult> {
+    const input = (ctx.job.input as Record<string, unknown> | undefined) ?? {};
+    let gitlabProjectId = input.gitlabProjectId as string | number | undefined;
+    const gitlabToken = input.gitlabToken as string | undefined;
+
+    const token = gitlabToken ?? ctx.sourceCtx.token;
+    const gitlabProvider = ctx.providerRegistry.getCapability(
+      PROVIDER.GITLAB,
+      CAPABILITY.GITLAB_VARIABLES,
+    );
+
+    const gitlabCtx: ProviderContext = {
+      token,
+      ...(ctx.targetCtx.budget ? { budget: ctx.targetCtx.budget } : {}),
+      ...(ctx.targetCtx.fetchFn ? { fetchFn: ctx.targetCtx.fetchFn } : {}),
+    };
+
+    // Auto-detect project ID from Project Access Token if not passed manually
+    if (!gitlabProjectId) {
+      try {
+        const projects = await gitlabProvider.listProjects(gitlabCtx);
+        if (projects[0]) {
+          gitlabProjectId = projects[0].id;
+        }
+      } catch {
+        // continue
+      }
+    }
+
+    if (!gitlabProjectId) {
+      await ctx.log(
+        JOB_EVENT_LEVEL.WARN,
+        'Could not determine GitLab project from token; skipping GitLab CI/CD rewire.',
+      );
+      return {
+        status: STEP_STATUS.SKIPPED,
+        result: { reason: 'No gitlabProjectId provided or detected' },
+      };
+    }
+
+    let existingVars: GitLabVariable[] = [];
+    try {
+      existingVars = await gitlabProvider.listVariables(gitlabCtx, gitlabProjectId);
+    } catch (err) {
+      await ctx.log(
+        JOB_EVENT_LEVEL.WARN,
+        `Could not read GitLab variables directly: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    const previousValues: Record<string, string> = {};
+    for (const v of existingVars) {
+      previousValues[v.key] = v.value;
+    }
+
+    const targetToken = ctx.targetCtx.token;
+    const targetOrgId =
+      ctx.targetCtx.externalAccountId ?? ctx.targetAccount.externalAccountId ?? '';
+    const createResult = getPriorStepResult(ctx, STEP_TYPE.VERCEL_CREATE_PROJECT);
+    const targetProjectId =
+      (createResult?.targetProjectId as string | undefined) ?? ctx.resource.externalId;
+
+    const updates: Array<{ key: string; value: string; masked?: boolean }> = [
+      { key: 'VERCEL_TOKEN', value: targetToken, masked: true },
+    ];
+
+    if (existingVars.some((v) => v.key === 'VERCEL_TEAM_ID')) {
+      updates.push({ key: 'VERCEL_TEAM_ID', value: targetOrgId, masked: false });
+    } else {
+      updates.push({ key: 'VERCEL_ORG_ID', value: targetOrgId, masked: false });
+    }
+
+    updates.push({ key: 'VERCEL_PROJECT_ID', value: targetProjectId, masked: false });
+
+    const updatedKeys: string[] = [];
+    for (const item of updates) {
+      await gitlabProvider.upsertVariable(gitlabCtx, gitlabProjectId, item);
+      updatedKeys.push(item.key);
+    }
+
+    await ctx.log(
+      JOB_EVENT_LEVEL.INFO,
+      `Successfully rewired ${updatedKeys.length} GitLab CI/CD variable(s) on project ${gitlabProjectId}: ${updatedKeys.join(', ')}.`,
+    );
+
+    return {
+      status: STEP_STATUS.SUCCEEDED,
+      result: {
+        gitlabProjectId,
+        updatedKeys,
+        previousValues,
+      },
+    };
+  },
+  async compensate(ctx): Promise<void> {
+    const res = ctx.step.result ?? {};
+    const gitlabProjectId = res.gitlabProjectId as string | number | undefined;
+    const previousValues = (res.previousValues as Record<string, string> | undefined) ?? {};
+    if (!gitlabProjectId || Object.keys(previousValues).length === 0) return;
+
+    const input = (ctx.job.input as Record<string, unknown> | undefined) ?? {};
+    const token = (input.gitlabToken as string | undefined) ?? ctx.sourceCtx.token;
+    const gitlabProvider = ctx.providerRegistry.getCapability(
+      PROVIDER.GITLAB,
+      CAPABILITY.GITLAB_VARIABLES,
+    );
+    const gitlabCtx: ProviderContext = {
+      token,
+      budget: ctx.targetCtx.budget,
+      fetchFn: ctx.targetCtx.fetchFn,
+    };
+
+    for (const [key, value] of Object.entries(previousValues)) {
+      await gitlabProvider.upsertVariable(gitlabCtx, gitlabProjectId, { key, value });
+    }
+    await ctx.log(
+      JOB_EVENT_LEVEL.WARN,
+      `Compensated: restored ${Object.keys(previousValues).length} GitLab variable(s) to previous values.`,
+    );
+  },
+};
+
 export const STEP_REGISTRY: Record<StepType, StepDefinition> = {
   [STEP_TYPE.PREFLIGHT_VERIFY_ACCOUNTS]: preflightVerifyAccountsStep,
   [STEP_TYPE.SNAPSHOT_RESOURCE]: snapshotResourceStep,
@@ -1458,4 +1683,6 @@ export const STEP_REGISTRY: Record<StepType, StepDefinition> = {
   [STEP_TYPE.SUPABASE_PAUSE_SOURCE]: supabasePauseSourceStep,
   [STEP_TYPE.DNS_REPOINT_RECORDS]: dnsRepointRecordsStep,
   [STEP_TYPE.ENV_REWIRE_VARS]: envRewireVarsStep,
+  [STEP_TYPE.VERCEL_SYNC_RULES]: vercelSyncRulesStep,
+  [STEP_TYPE.GITLAB_REWIRE_VARS]: gitlabRewireVarsStep,
 };

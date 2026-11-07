@@ -15,6 +15,8 @@ import {
   ArrowRightLeft,
   CheckCircle2,
   Database,
+  ExternalLink,
+  Globe,
   KeyRound,
   Pause,
   Play,
@@ -73,6 +75,18 @@ export const ProjectsView = () => {
     queryFn: async () => {
       const res = await apiClient.api.v1.resources.$get({
         query: { kind: RESOURCE_KIND.SUPABASE_PROJECT, limit: '100' },
+      });
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.data;
+    },
+  });
+
+  const projectDomainsQuery = useQuery({
+    queryKey: queryKeys.resources.list({ kind: RESOURCE_KIND.PROJECT_DOMAIN }),
+    queryFn: async () => {
+      const res = await apiClient.api.v1.resources.$get({
+        query: { kind: RESOURCE_KIND.PROJECT_DOMAIN, limit: '100' },
       });
       if (!res.ok) return [];
       const json = await res.json();
@@ -163,6 +177,59 @@ export const ProjectsView = () => {
   const accountMap = useMemo(() => {
     return new Map((accountsQuery.data ?? []).map((acc) => [acc.id, acc]));
   }, [accountsQuery.data]);
+
+  const domainsByProjectId = useMemo(() => {
+    const map = new Map<string, ResourceDto[]>();
+    for (const d of projectDomainsQuery.data ?? []) {
+      if (d.parentId) {
+        const list = map.get(d.parentId) ?? [];
+        list.push(d);
+        map.set(d.parentId, list);
+      }
+    }
+    return map;
+  }, [projectDomainsQuery.data]);
+
+  const getProjectDomains = (
+    proj: ResourceDto,
+    isVercel: boolean,
+  ): Array<{ url: string; label: string; verified?: boolean | undefined }> => {
+    if (isVercel) {
+      const synced = domainsByProjectId.get(proj.id) ?? [];
+      if (synced.length > 0) {
+        return synced.map((d) => ({
+          url: `https://${d.name}`,
+          label: d.name,
+          verified: typeof d.data?.verified === 'boolean' ? d.data.verified : undefined,
+        }));
+      }
+      return [
+        {
+          url: `https://${proj.name}.vercel.app`,
+          label: `${proj.name}.vercel.app`,
+        },
+      ];
+    }
+
+    const externalId = proj.externalId;
+    const dbHost = typeof proj.data?.dbHost === 'string' ? proj.data.dbHost : null;
+    const domains: Array<{ url: string; label: string; verified?: boolean | undefined }> = [];
+    if (externalId) {
+      domains.push({
+        url: `https://${externalId}.supabase.co`,
+        label: `${externalId}.supabase.co`,
+        verified: true,
+      });
+    }
+    if (dbHost && !domains.some((d) => d.label === dbHost)) {
+      domains.push({
+        url: `https://${dbHost}`,
+        label: dbHost,
+        verified: true,
+      });
+    }
+    return domains;
+  };
 
   const allAccounts = accountsQuery.data ?? [];
   const relevantAccounts = useMemo(() => {
@@ -486,7 +553,25 @@ export const ProjectsView = () => {
                                 )}
                               </div>
 
-                              <div className="mt-0.5 text-[11px] text-zinc-500">
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                {getProjectDomains(proj, isVercel).map((dom) => (
+                                  <a
+                                    key={dom.url}
+                                    href={dom.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/90 px-2 py-0.5 text-[11px] font-mono text-emerald-400 hover:border-emerald-500/50 hover:bg-zinc-800 transition"
+                                    title={`Mở trang web: ${dom.url}`}
+                                  >
+                                    <Globe className="h-3 w-3 text-emerald-400 shrink-0" />
+                                    <span className="truncate max-w-[220px]">{dom.label}</span>
+                                    <ExternalLink className="h-2.5 w-2.5 opacity-60 hover:opacity-100 shrink-0" />
+                                  </a>
+                                ))}
+                              </div>
+
+                              <div className="mt-1 text-[11px] text-zinc-500">
                                 Ref: {proj.externalId}
                                 {!isVercel && proj.data.region
                                   ? ` · Vùng: ${String(proj.data.region)}`
@@ -568,28 +653,40 @@ export const ProjectsView = () => {
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {children.map((item) => {
               const isEnv = item.kind === RESOURCE_KIND.ENV_VAR;
+              const isDomain = item.kind === RESOURCE_KIND.PROJECT_DOMAIN;
               const isWriteOnly = isEnv && item.data.readable === false;
               return (
                 <div
                   key={item.id}
                   className="flex items-center justify-between rounded-xl border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-xs"
                 >
-                  <div>
-                    <div className="font-mono font-medium text-zinc-200">{item.name}</div>
+                  <div className="flex-1 min-w-0 pr-2">
+                    <div className="font-mono font-medium text-zinc-200 truncate">{item.name}</div>
                     <div className="text-[11px] text-zinc-500">{item.kind}</div>
                   </div>
-                  {isEnv ? (
+                  {isDomain ? (
+                    <a
+                      href={`https://${item.name}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-[11px] font-mono text-emerald-300 hover:underline shrink-0"
+                    >
+                      <Globe className="h-3 w-3" />
+                      <span>Visit</span>
+                      <ExternalLink className="h-2.5 w-2.5 opacity-70" />
+                    </a>
+                  ) : isEnv ? (
                     isWriteOnly ? (
-                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">
+                      <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300 shrink-0">
                         write-only secret
                       </span>
                     ) : (
-                      <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300">
+                      <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300 shrink-0">
                         readable (encrypted)
                       </span>
                     )
                   ) : (
-                    <span className="rounded bg-zinc-800 px-2 py-0.5 font-mono text-[11px] text-zinc-300">
+                    <span className="rounded bg-zinc-800 px-2 py-0.5 font-mono text-[11px] text-zinc-300 shrink-0">
                       active
                     </span>
                   )}

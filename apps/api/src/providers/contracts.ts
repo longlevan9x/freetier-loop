@@ -11,16 +11,16 @@ import type { SubrequestBudget } from './http-client';
 
 export type ProviderContext = {
   token: string;
-  externalAccountId?: string | null;
-  budget?: SubrequestBudget;
-  fetchFn?: typeof fetch;
+  externalAccountId?: string | null | undefined;
+  budget?: SubrequestBudget | undefined;
+  fetchFn?: typeof fetch | undefined;
 };
 
 export type VerifiedAccountInfo = {
   valid: boolean;
   externalAccountId: string;
-  labelSuggested?: string;
-  accountType?: VercelAccountType;
+  labelSuggested?: string | undefined;
+  accountType?: VercelAccountType | undefined;
   scopesVerified: string[];
 };
 
@@ -115,6 +115,33 @@ export type UsageMetricSnapshot = {
   warning?: string;
 };
 
+export type GitLabVariable = {
+  key: string;
+  value: string;
+  variable_type?: 'env_var' | 'file' | undefined;
+  protected?: boolean | undefined;
+  masked?: boolean | undefined;
+  raw?: boolean | undefined;
+  environment_scope?: string | undefined;
+  description?: string | null | undefined;
+};
+
+export type GitLabProject = {
+  id: number;
+  name: string;
+  pathWithNamespace: string;
+  webUrl: string;
+  defaultBranch?: string | undefined;
+};
+
+export type ProjectRules = {
+  rewrites?: Array<{ source: string; destination: string }>;
+  redirects?: Array<{ source: string; destination: string; permanent?: boolean }>;
+  headers?: Array<{ source: string; headers: Array<{ key: string; value: string }> }>;
+  cleanUrls?: boolean;
+  trailingSlash?: boolean;
+};
+
 export interface AccountVerifier {
   verify(ctx: ProviderContext): Promise<VerifiedAccountInfo>;
 }
@@ -181,6 +208,8 @@ export interface ProjectProvider {
   ): Promise<{ transferred: boolean; code?: string }>;
   pauseProject?(ctx: ProviderContext, projectId: string): Promise<void>;
   restoreProject?(ctx: ProviderContext, projectId: string): Promise<void>;
+  getProjectRules?(ctx: ProviderContext, projectId: string): Promise<ProjectRules>;
+  updateProjectRules?(ctx: ProviderContext, projectId: string, rules: ProjectRules): Promise<void>;
 }
 
 export interface ProjectDomainProvider {
@@ -225,6 +254,36 @@ export interface UsageProvider {
   getUsage(ctx: ProviderContext): Promise<UsageMetricSnapshot[]>;
 }
 
+export interface GitLabVariableProvider {
+  listProjects(ctx: ProviderContext): Promise<GitLabProject[]>;
+  listVariables(ctx: ProviderContext, projectIdOrPath: string | number): Promise<GitLabVariable[]>;
+  upsertVariable(
+    ctx: ProviderContext,
+    projectIdOrPath: string | number,
+    variable: {
+      key: string;
+      value: string;
+      masked?: boolean;
+      protected?: boolean;
+    },
+  ): Promise<void>;
+}
+
+export interface GitLabVariableProvider {
+  listProjects(ctx: ProviderContext): Promise<GitLabProject[]>;
+  listVariables(ctx: ProviderContext, projectIdOrPath: string | number): Promise<GitLabVariable[]>;
+  upsertVariable(
+    ctx: ProviderContext,
+    projectIdOrPath: string | number,
+    variable: {
+      key: string;
+      value: string;
+      masked?: boolean;
+      protected?: boolean;
+    },
+  ): Promise<void>;
+}
+
 export type CapabilityMap = {
   account_verifier: AccountVerifier;
   zones: ZoneProvider;
@@ -236,6 +295,7 @@ export type CapabilityMap = {
   edge_functions: EdgeFunctionProvider;
   sql_query: SqlQueryProvider;
   usage: UsageProvider;
+  gitlab_variables: GitLabVariableProvider;
 };
 
 export interface ProviderAdapter {
