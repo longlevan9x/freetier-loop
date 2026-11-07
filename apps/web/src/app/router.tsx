@@ -6,7 +6,9 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  redirect,
   useNavigate,
+  useRouterState,
 } from '@tanstack/react-router';
 import { ArrowRightLeft, Command, LogOut } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -39,6 +41,8 @@ export const RootLayout = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const routerState = useRouterState();
+  const isLoginPage = routerState.location.pathname === WEB_ROUTES.LOGIN;
 
   const sessionQuery = useQuery({
     queryKey: queryKeys.session.current,
@@ -67,67 +71,69 @@ export const RootLayout = () => {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="border-b border-zinc-800/80 bg-zinc-900/50 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
-              <ArrowRightLeft className="h-4 w-4" />
-            </span>
-            <div>
-              <span className="font-semibold tracking-tight">freetier-loop</span>
-              <span className="ml-2 rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
-                Admin Console
+      {!isLoginPage ? (
+        <header className="border-b border-zinc-800/80 bg-zinc-900/50 backdrop-blur">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
+                <ArrowRightLeft className="h-4 w-4" />
               </span>
+              <div>
+                <span className="font-semibold tracking-tight">freetier-loop</span>
+                <span className="ml-2 rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
+                  Admin Console
+                </span>
+              </div>
             </div>
-          </div>
 
-          <nav
-            aria-label="Primary navigation"
-            className="flex flex-wrap items-center gap-4 text-sm text-zinc-400"
-          >
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                className="transition-colors hover:text-zinc-100 [&.active]:font-medium [&.active]:text-emerald-400"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setPaletteOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+            <nav
+              aria-label="Primary navigation"
+              className="flex flex-wrap items-center gap-4 text-sm text-zinc-400"
             >
-              <Command className="h-3 w-3" />
-              <span>⌘K</span>
-            </button>
+              {NAV_ITEMS.map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className="transition-colors hover:text-zinc-100 [&.active]:font-medium [&.active]:text-emerald-400"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
 
-            {sessionQuery.data ? (
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
-                onClick={() => void handleSignOut()}
-                className="inline-flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-300 hover:border-red-800/60 hover:text-red-300"
+                onClick={() => setPaletteOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
               >
-                <LogOut className="h-3 w-3" />
-                Sign Out
+                <Command className="h-3 w-3" />
+                <span>⌘K</span>
               </button>
-            ) : (
-              <Link
-                to={WEB_ROUTES.LOGIN}
-                className="rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs text-emerald-400 hover:border-emerald-500/60"
-              >
-                Login
-              </Link>
-            )}
-          </div>
-        </div>
-      </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
+              {sessionQuery.data ? (
+                <button
+                  type="button"
+                  onClick={() => void handleSignOut()}
+                  className="inline-flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-300 hover:border-red-800/60 hover:text-red-300"
+                >
+                  <LogOut className="h-3 w-3" />
+                  Sign Out
+                </button>
+              ) : (
+                <Link
+                  to={WEB_ROUTES.LOGIN}
+                  className="rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs text-emerald-400 hover:border-emerald-500/60"
+                >
+                  Login
+                </Link>
+              )}
+            </div>
+          </div>
+        </header>
+      ) : null}
+
+      <main className={isLoginPage ? 'w-full' : 'mx-auto max-w-7xl px-6 py-8'}>
         <Outlet />
       </main>
 
@@ -177,6 +183,16 @@ const NotFoundPage = () => (
   </BentoGrid>
 );
 
+const requireAuthGuard = async () => {
+  const session = await fetchCurrentSession();
+  if (!session) {
+    throw redirect({
+      to: WEB_ROUTES.LOGIN,
+    });
+  }
+  return { session };
+};
+
 const rootRoute = createRootRoute({
   component: RootLayout,
   notFoundComponent: NotFoundPage,
@@ -185,54 +201,70 @@ const rootRoute = createRootRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.LOGIN,
+  beforeLoad: async () => {
+    const session = await fetchCurrentSession();
+    if (session) {
+      throw redirect({
+        to: WEB_ROUTES.DASHBOARD,
+      });
+    }
+  },
   component: LoginPage,
 });
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.DASHBOARD,
+  beforeLoad: requireAuthGuard,
   component: DashboardView,
 });
 
 const accountsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.ACCOUNTS,
+  beforeLoad: requireAuthGuard,
   component: AccountsView,
 });
 
 const domainsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.DOMAINS,
+  beforeLoad: requireAuthGuard,
   component: DomainsView,
 });
 
 const projectsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.PROJECTS,
+  beforeLoad: requireAuthGuard,
   component: ProjectsView,
 });
 
 const migrationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.MIGRATIONS,
+  beforeLoad: requireAuthGuard,
   component: MigrationsView,
 });
 
 const snapshotsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.SNAPSHOTS,
+  beforeLoad: requireAuthGuard,
   component: SnapshotsView,
 });
 
 const auditLogsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.AUDIT_LOGS,
+  beforeLoad: requireAuthGuard,
   component: AuditLogsView,
 });
 
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.SETTINGS,
+  beforeLoad: requireAuthGuard,
   component: SettingsView,
 });
 
