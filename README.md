@@ -23,17 +23,28 @@ Single-admin control plane to monitor quotas and safely migrate domains, DNS zon
 2. **Configure local environment:**
    ```bash
    cp .dev.vars.example .dev.vars
-   cp .env.example apps/web/.env
+   cp apps/web/.env.example apps/web/.env
    ```
-3. **Run quality checks & tests:**
+3. **Run local migration & seed admin account:**
+   ```bash
+   pnpm db:migrate:local
+   pnpm db:seed:admin -- --email admin@example.com --password CorrectHorseBatteryStaple!9
+   ```
+   > **Tài khoản Admin mặc định trên Local:**
+   > - **Email:** `admin@example.com` (phải nằm trong danh sách `ADMIN_EMAILS` của file `.dev.vars`)
+   > - **Mật khẩu:** `CorrectHorseBatteryStaple!9` (tối thiểu 12 ký tự)
+   > - Bạn có thể tạo thêm hoặc đổi mật khẩu bất kỳ lúc nào bằng lệnh:  
+   >   `pnpm db:seed:admin -- --email email-cua-ban@gmail.com --password MatKhauMoiCuaBan`
+
+4. **Run quality checks & tests:**
    ```bash
    pnpm lint && pnpm typecheck && pnpm test && pnpm build
    ```
-4. **Start local dev servers (API Worker + Vite SPA):**
+5. **Start local dev servers (API Worker + Vite SPA):**
    ```bash
    pnpm dev
    ```
-   - Web SPA: `http://localhost:5173` (proxies `/api/*` to `:8787`)
+   - Web SPA: `http://localhost:5173` (tự động redirect đến `/login`)
    - API Worker: `http://localhost:8787/api/v1/health`
 
 ---
