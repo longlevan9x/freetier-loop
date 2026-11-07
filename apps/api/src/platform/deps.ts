@@ -91,7 +91,7 @@ export const createDefaultDeps = (
 
   const d1 = (rawEnv.DB as D1Binding | undefined) ?? createNoopD1Binding();
   const db = overrides.db ?? createAppDatabase(d1);
-  const fetchFn = overrides.fetchFn ?? fetch;
+  const fetchFn = (overrides.fetchFn ?? globalThis.fetch).bind(globalThis);
 
   const cipher =
     overrides.cipher ??

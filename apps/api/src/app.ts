@@ -107,6 +107,7 @@ export const createApp = (customDeps?: Deps) => {
     c.var.deps?.platform.logger.error('Unhandled request error', {
       requestId,
       message: err.message,
+      stack: err.stack,
     });
 
     const body: ErrorEnvelope = {
