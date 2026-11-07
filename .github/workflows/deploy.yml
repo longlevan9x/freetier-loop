@@ -1,16 +1,14 @@
-name: Deploy to Cloudflare
+name: CI / CD
 
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
-concurrency:
-  group: deploy-production
-  cancel-in-progress: false
-
 jobs:
-  deploy:
+  verify:
+    name: Verify Quality Gates
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -28,17 +26,58 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify Quality Gates
-        run: |
-          pnpm lint
-          pnpm typecheck
-          pnpm test
+      - name: Lint & format check
+        run: pnpm lint
+
+      - name: Typecheck all packages
+        run: pnpm typecheck
+
+      - name: Run unit & integration tests
+        run: pnpm test
 
       - name: Build Web Frontend
         env:
           VITE_API_BASE_URL: /
           VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
         run: pnpm --filter @freetier-loop/web build
+
+      - name: Upload Web Artifact
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 1
+
+  deploy:
+    name: Deploy to Cloudflare
+    needs: verify
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download Web Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
 
       - name: Apply D1 Migrations (Remote)
         env:
@@ -63,4 +102,3 @@ jobs:
             echo "Please configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in your GitHub Repository Secrets."
             exit 1
           fi
-
