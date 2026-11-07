@@ -58,6 +58,7 @@ free-tier quota. Single-admin, no public sign-up.
 - Before coding a task, read its entry in `docs/TASKS.md`; tick it (`[x]`) when its
   acceptance criteria pass. Keep tasks small; one task ≈ one PR/commit series.
 - Conventional Commits (`feat(api): …`, `fix(web): …`, `chore: …`).
+- **Git commits & push:** Do NOT automatically commit or push code. Always leave committing and pushing to the user, unless the user explicitly asks to commit or push.
 - Every new service/provider method gets a unit test; every route gets an integration test.
 - Run `pnpm lint && pnpm typecheck && pnpm test` before declaring a task done.
 - If an external API behavior is uncertain, verify it (spike or docs) and record the

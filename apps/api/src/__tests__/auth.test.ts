@@ -391,5 +391,76 @@ describe('M1 Auth & Security (T-031..T-036)', () => {
     ).data;
     expect(sessionsList2.length).toBe(1);
     expect(sessionsList2[0]?.isCurrent).toBe(true);
+
+    // 10. Sign out completely (deleting active session from db)
+    const signOutRes = await app.request(`${AUTH_PREFIX}/sign-out`, {
+      method: 'POST',
+      headers: { cookie: validTotpCookie },
+    });
+    expect(signOutRes.status).toBe(HTTP_STATUS.OK);
+
+    // 11. Sign in again from the SAME IP (198.51.100.99) and SAME Device (Chrome-Device-1)
+    // Even though session table is now empty, audit_logs remembers this trusted device/IP!
+    const reSignInSameDevice = await app.request(`${AUTH_PREFIX}/sign-in/email`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        [HEADER.CAPTCHA]: 'pass-token',
+        'x-forwarded-for': '198.51.100.99',
+        'cf-ipcountry': 'JP',
+        'user-agent': 'Chrome-Device-1',
+      },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        password: 'CorrectHorseBatteryStaple!1',
+      }),
+    });
+    expect(reSignInSameDevice.status).toBe(HTTP_STATUS.OK);
+    const reSignInBody = (await reSignInSameDevice.json()) as {
+      data: { requiresTwoFactor: boolean };
+    };
+    expect(reSignInBody.data.requiresTwoFactor).toBe(false);
+
+    // 12. Sign in from a brand new IP (203.0.113.88) with known device -> triggers 2FA for new_ip
+    const unknownIpSignIn = await app.request(`${AUTH_PREFIX}/sign-in/email`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        [HEADER.CAPTCHA]: 'pass-token',
+        'x-forwarded-for': '203.0.113.88',
+        'cf-ipcountry': 'SG',
+        'user-agent': 'Chrome-Device-1',
+      },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        password: 'CorrectHorseBatteryStaple!1',
+      }),
+    });
+    const unknownIpBody = (await unknownIpSignIn.json()) as {
+      data: { requiresTwoFactor: boolean; reason: string };
+    };
+    expect(unknownIpBody.data.requiresTwoFactor).toBe(true);
+    expect(unknownIpBody.data.reason).toBe('new_ip');
+
+    // 13. Sign in from known IP (198.51.100.99) with unknown Device (Firefox-Device-99) -> triggers 2FA for new_device
+    const unknownDeviceSignIn = await app.request(`${AUTH_PREFIX}/sign-in/email`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        [HEADER.CAPTCHA]: 'pass-token',
+        'x-forwarded-for': '198.51.100.99',
+        'cf-ipcountry': 'JP',
+        'user-agent': 'Firefox-Device-99',
+      },
+      body: JSON.stringify({
+        email: 'admin@example.com',
+        password: 'CorrectHorseBatteryStaple!1',
+      }),
+    });
+    const unknownDeviceBody = (await unknownDeviceSignIn.json()) as {
+      data: { requiresTwoFactor: boolean; reason: string };
+    };
+    expect(unknownDeviceBody.data.requiresTwoFactor).toBe(true);
+    expect(unknownDeviceBody.data.reason).toBe('new_device');
   });
 });

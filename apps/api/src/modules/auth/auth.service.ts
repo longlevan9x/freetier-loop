@@ -1,4 +1,4 @@
-import { account, loginAttempts, rateLimit, session, user } from '@freetier-loop/db';
+import { account, auditLogs, loginAttempts, rateLimit, session, user } from '@freetier-loop/db';
 import {
   AUTH,
   AUTH_RATE_LIMIT,
@@ -8,7 +8,7 @@ import {
   ID_PREFIX,
   newId,
 } from '@freetier-loop/shared';
-import { and, desc, eq, gt, ne } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, ne } from 'drizzle-orm';
 import type { AppConfig } from '../../config/env.schema';
 import type { AppDatabase } from '../../platform/db';
 import type { Clock } from '../../platform/deps';
@@ -18,6 +18,49 @@ import type { SessionUser } from '../../types';
 import type { AuditService } from '../audit/audit.service';
 
 export const SESSION_COOKIE_NAME = 'better-auth.session_token' as const;
+
+export function normalizeIp(ip: string | null | undefined): string {
+  if (!ip) return '127.0.0.1';
+  let first = ip.split(',')[0]?.trim() ?? '127.0.0.1';
+  if (!first) first = '127.0.0.1';
+
+  if (first === '::1' || first === 'localhost') {
+    return '127.0.0.1';
+  }
+
+  if (first.startsWith('::ffff:')) {
+    first = first.slice(7);
+  }
+
+  const ipv4WithPortMatch = first.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+$/);
+  if (ipv4WithPortMatch?.[1]) {
+    first = ipv4WithPortMatch[1];
+  }
+
+  return first;
+}
+
+export function normalizeUserAgent(ua: string | null | undefined): string {
+  if (!ua) return 'unknown';
+  return ua.trim();
+}
+
+export function extractMetaUserAgent(meta: unknown): string | null {
+  if (!meta) return null;
+  if (typeof meta === 'string') {
+    try {
+      const parsed = JSON.parse(meta);
+      return typeof parsed?.userAgent === 'string' ? parsed.userAgent : null;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof meta === 'object' && meta !== null && 'userAgent' in meta) {
+    const ua = (meta as Record<string, unknown>).userAgent;
+    return typeof ua === 'string' ? ua : null;
+  }
+  return null;
+}
 
 export type SignInInput = {
   email: string;
@@ -361,14 +404,54 @@ export class AuthService {
 
     // 2FA check (Adaptive or Always)
     if (foundUser.twoFactorEnabled && foundUser.twoFactorSecret) {
+      const normalizedCurrentIp = normalizeIp(input.ip);
+      const normalizedCurrentUa = normalizeUserAgent(input.userAgent);
+
+      // 1. Prior active sessions
       const priorSessions = await this.db
-        .select()
+        .select({
+          ipAddress: session.ipAddress,
+          userAgent: session.userAgent,
+        })
         .from(session)
         .where(eq(session.userId, foundUser.id))
         .limit(50);
 
-      const isKnownIp = priorSessions.some((s) => s.ipAddress === input.ip);
-      const isKnownDevice = priorSessions.some((s) => s.userAgent === input.userAgent);
+      // 2. Past successful logins or 2FA activations from audit logs (within 30 days)
+      const thirtyDaysAgo = new Date(nowMs - 30 * 24 * 60 * 60 * 1000);
+      const recentAuditRows = await this.db
+        .select({
+          ip: auditLogs.ip,
+          meta: auditLogs.meta,
+          action: auditLogs.action,
+        })
+        .from(auditLogs)
+        .where(
+          and(
+            eq(auditLogs.userId, foundUser.id),
+            inArray(auditLogs.action, ['auth.sign_in.succeeded', 'auth.2fa.enabled']),
+            gt(auditLogs.createdAt, thirtyDaysAgo),
+          ),
+        )
+        .orderBy(desc(auditLogs.createdAt))
+        .limit(50);
+
+      const knownIps = new Set<string>();
+      const knownDevices = new Set<string>();
+
+      for (const s of priorSessions) {
+        if (s.ipAddress) knownIps.add(normalizeIp(s.ipAddress));
+        if (s.userAgent) knownDevices.add(normalizeUserAgent(s.userAgent));
+      }
+
+      for (const a of recentAuditRows) {
+        if (a.ip) knownIps.add(normalizeIp(a.ip));
+        const ua = extractMetaUserAgent(a.meta);
+        if (ua) knownDevices.add(normalizeUserAgent(ua));
+      }
+
+      const isKnownIp = knownIps.has(normalizedCurrentIp);
+      const isKnownDevice = knownDevices.has(normalizedCurrentUa);
       const isAdaptiveChallengeNeeded = !isKnownIp || !isKnownDevice;
       const mustChallenge = Boolean(foundUser.twoFactorAlways) || isAdaptiveChallengeNeeded;
 
@@ -385,28 +468,28 @@ export class AuthService {
             action: 'auth.2fa.challenge_issued',
             targetType: 'user',
             targetId: foundUser.id,
-            ip: input.ip,
-            meta: { reason, country: input.country, userAgent: input.userAgent },
+            ip: normalizedCurrentIp,
+            meta: { reason, country: input.country, userAgent: normalizedCurrentUa },
           });
 
           return {
             requiresTwoFactor: true,
             reason,
-            ip: input.ip,
+            ip: normalizedCurrentIp,
             country: input.country,
-            userAgent: input.userAgent,
+            userAgent: normalizedCurrentUa,
           };
         }
 
         const valid2fa = await verifyTotpCode(foundUser.twoFactorSecret, input.twoFactorCode);
         if (!valid2fa) {
-          await this.recordFailedAttempt(normalizedEmail, input.ip);
+          await this.recordFailedAttempt(normalizedEmail, normalizedCurrentIp);
           await this.auditService.record({
             userId: foundUser.id,
             action: 'auth.2fa.failed',
             targetType: 'user',
             targetId: foundUser.id,
-            ip: input.ip,
+            ip: normalizedCurrentIp,
           });
           throw new AppError(
             ERROR_CODE.AUTH_INVALID_2FA,
@@ -420,14 +503,16 @@ export class AuthService {
     const token = `${crypto.randomUUID().replace(/-/g, '')}${crypto.randomUUID().replace(/-/g, '')}`;
     const expiresAtMs = nowMs + AUTH.SESSION_TTL_SECONDS * 1000;
     const now = new Date(nowMs);
+    const normalizedIp = normalizeIp(input.ip);
+    const normalizedUa = normalizeUserAgent(input.userAgent);
 
     await this.db.insert(session).values({
       id: `ses_${crypto.randomUUID().replace(/-/g, '')}`,
       token,
       userId: foundUser.id,
       expiresAt: new Date(expiresAtMs),
-      ipAddress: input.ip,
-      userAgent: input.userAgent,
+      ipAddress: normalizedIp,
+      userAgent: normalizedUa,
       country: input.country,
       createdAt: now,
       updatedAt: now,
@@ -438,10 +523,10 @@ export class AuthService {
       action: 'auth.sign_in.succeeded',
       targetType: 'user',
       targetId: foundUser.id,
-      ip: input.ip,
+      ip: normalizedIp,
       meta: {
         country: input.country,
-        userAgent: input.userAgent,
+        userAgent: normalizedUa,
         twoFactorVerified: Boolean(input.twoFactorCode),
       },
     });
@@ -499,7 +584,12 @@ export class AuthService {
     return { secret, uri, otpauthUri: uri };
   }
 
-  async enable2fa(userId: string, code: string, always = false): Promise<void> {
+  async enable2fa(
+    userId: string,
+    code: string,
+    always = false,
+    context?: { ip?: string; userAgent?: string; country?: string },
+  ): Promise<void> {
     const rows = await this.db.select().from(user).where(eq(user.id, userId)).limit(1);
     const u = rows[0];
     if (!u || !u.twoFactorSecret) {
@@ -527,12 +617,20 @@ export class AuthService {
       })
       .where(eq(user.id, userId));
 
+    const normalizedIp = context?.ip ? normalizeIp(context.ip) : null;
+    const normalizedUa = context?.userAgent ? normalizeUserAgent(context.userAgent) : null;
+
     await this.auditService.record({
       userId,
       action: 'auth.2fa.enabled',
       targetType: 'user',
       targetId: userId,
-      meta: { always },
+      ip: normalizedIp,
+      meta: {
+        always,
+        userAgent: normalizedUa,
+        country: context?.country,
+      },
     });
   }
 

@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import type { AppEnv, SessionUser } from '../../types';
-import { SESSION_COOKIE_NAME } from './auth.service';
+import { SESSION_COOKIE_NAME, normalizeIp, normalizeUserAgent } from './auth.service';
 
 const signInBodySchema = z.object({
   email: z.string().email(),
@@ -23,6 +23,15 @@ const disable2faSchema = z.object({
 
 export const createAuthRoutes = () => {
   const app = new Hono<AppEnv>();
+
+  const getClientContext = (c: { req: { header: (name: string) => string | undefined } }) => {
+    const rawIp =
+      c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? '127.0.0.1';
+    const ip = normalizeIp(rawIp);
+    const country = c.req.header('cf-ipcountry') ?? 'LOCAL';
+    const userAgent = normalizeUserAgent(c.req.header('user-agent'));
+    return { ip, country, userAgent };
+  };
 
   const requireCurrentSession = async (c: {
     var: {
@@ -55,9 +64,7 @@ export const createAuthRoutes = () => {
   app.post('/sign-in/email', zValidator('json', signInBodySchema), async (c) => {
     const body = c.req.valid('json');
     const captchaToken = c.req.header(HEADER.CAPTCHA);
-    const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for') ?? '127.0.0.1';
-    const country = c.req.header('cf-ipcountry') ?? 'LOCAL';
-    const userAgent = c.req.header('user-agent') ?? 'unknown';
+    const { ip, country, userAgent } = getClientContext(c);
 
     const result = await c.var.deps.authService.signInEmail({
       email: body.email,
@@ -112,7 +119,7 @@ export const createAuthRoutes = () => {
 
   app.post('/sign-out', async (c) => {
     const token = getCookie(c, SESSION_COOKIE_NAME);
-    const ip = c.req.header('cf-connecting-ip') ?? '127.0.0.1';
+    const { ip } = getClientContext(c);
     await c.var.deps.authService.signOutByToken(token, ip);
     deleteCookie(c, SESSION_COOKIE_NAME, { path: '/' });
     return c.json(ok({ signedOut: true }), HTTP_STATUS.OK);
@@ -154,7 +161,12 @@ export const createAuthRoutes = () => {
   app.post('/2fa/enable', zValidator('json', enable2faSchema), async (c) => {
     const { user: sessionUser } = await requireCurrentSession(c);
     const { code, always } = c.req.valid('json');
-    await c.var.deps.authService.enable2fa(sessionUser.id, code, always);
+    const { ip, country, userAgent } = getClientContext(c);
+    await c.var.deps.authService.enable2fa(sessionUser.id, code, always, {
+      ip,
+      country,
+      userAgent,
+    });
     return c.json(ok({ enabled: true }), HTTP_STATUS.OK);
   });
 
