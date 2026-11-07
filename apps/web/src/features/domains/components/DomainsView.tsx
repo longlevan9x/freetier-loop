@@ -5,6 +5,7 @@ import { ArrowRightLeft, Camera, Globe, Search, Shield } from 'lucide-react';
 import { useState } from 'react';
 import { BentoCard } from '../../../components/bento/BentoCard';
 import { BentoGrid } from '../../../components/bento/BentoGrid';
+import { Button } from '../../../components/ui/button';
 import { queryKeys } from '../../../lib/query-keys';
 import { apiClient } from '../../../lib/rpc';
 
@@ -141,14 +142,16 @@ export const DomainsView = () => {
                     </button>
 
                     <div className="flex items-center gap-2">
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         onClick={() => snapshotMutation.mutate(zone.id)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-200 hover:border-emerald-500/60"
+                        className="gap-1 h-7 text-xs"
                       >
                         <Camera className="h-3.5 w-3.5" />
                         Snapshot
-                      </button>
+                      </Button>
                       <Link
                         to={WEB_ROUTES.MIGRATIONS}
                         className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/20 px-2.5 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/30"
@@ -194,25 +197,29 @@ export const DomainsView = () => {
               </div>
               {children.length > pageSize ? (
                 <div className="flex items-center justify-between pt-2 text-xs">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     disabled={recordPage === 0}
                     onClick={() => setRecordPage((p) => Math.max(0, p - 1))}
-                    className="rounded border border-zinc-700 px-2 py-1 disabled:opacity-40"
+                    className="h-7 text-xs"
                   >
                     Prev 100
-                  </button>
+                  </Button>
                   <span className="text-zinc-400">
                     Page {recordPage + 1} / {Math.ceil(children.length / pageSize)}
                   </span>
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     disabled={(recordPage + 1) * pageSize >= children.length}
                     onClick={() => setRecordPage((p) => p + 1)}
-                    className="rounded border border-zinc-700 px-2 py-1 disabled:opacity-40"
+                    className="h-7 text-xs"
                   >
                     Next 100
-                  </button>
+                  </Button>
                 </div>
               ) : null}
             </div>

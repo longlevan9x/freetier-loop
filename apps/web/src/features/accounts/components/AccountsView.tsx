@@ -13,6 +13,7 @@ import { CheckCircle2, Cloud, KeyRound, Plus, RefreshCw, Trash2 } from 'lucide-r
 import { type FormEvent, useState } from 'react';
 import { BentoCard } from '../../../components/bento/BentoCard';
 import { BentoGrid } from '../../../components/bento/BentoGrid';
+import { Button } from '../../../components/ui/button';
 import {
   Select,
   SelectContent,
@@ -42,6 +43,7 @@ export const AccountsView = () => {
   const [syncProgress, setSyncProgress] = useState<Record<string, string>>({});
   const [deleteTarget, setDeleteTarget] = useState<ProviderAccountDto | null>(null);
   const [confirmLabel, setConfirmLabel] = useState('');
+  const [syncingAll, setSyncingAll] = useState(false);
 
   const accountsQuery = useQuery({
     queryKey: queryKeys.providerAccounts.all,
@@ -66,12 +68,15 @@ export const AccountsView = () => {
       if (!res.ok) throw body;
       return body;
     },
-    onSuccess: () => {
+    onSuccess: (body) => {
       setLabel('');
       setApiToken('');
       setFormError(null);
       void queryClient.invalidateQueries({ queryKey: queryKeys.providerAccounts.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
+      if (body?.data?.id) {
+        void handleChunkedSync(body.data.id);
+      }
     },
     onError: (err) => {
       setFormError(formatApiError(err, 'Could not add provider account'));
@@ -111,6 +116,16 @@ export const AccountsView = () => {
     }
   };
 
+  const handleSyncAll = async () => {
+    const accounts = accountsQuery.data ?? [];
+    if (accounts.length === 0 || syncingAll) return;
+    setSyncingAll(true);
+    for (const acc of accounts) {
+      await handleChunkedSync(acc.id);
+    }
+    setSyncingAll(false);
+  };
+
   const deleteMutation = useMutation({
     mutationFn: async (input: { id: string; confirm: string }) => {
       const res = await apiClient.api.v1['provider-accounts'][':id'].$delete({
@@ -137,12 +152,27 @@ export const AccountsView = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Provider Accounts</h1>
-        <p className="text-sm text-zinc-400">
-          Connect multiple Cloudflare, Vercel, and Supabase accounts. Tokens are encrypted with
-          AES-256-GCM at rest.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Provider Accounts</h1>
+          <p className="text-sm text-zinc-400">
+            Connect multiple Cloudflare, Vercel, and Supabase accounts. Tokens are encrypted with
+            AES-256-GCM at rest.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSyncAll}
+            disabled={syncingAll || (accountsQuery.data ?? []).length === 0}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${syncingAll ? 'animate-spin' : ''}`} />
+            {syncingAll ? 'Syncing All Accounts…' : 'Sync All Accounts'}
+          </Button>
+        </div>
       </div>
 
       <BentoGrid>
@@ -204,14 +234,14 @@ export const AccountsView = () => {
             </div>
 
             <div className="flex items-end">
-              <button
+              <Button
                 type="submit"
                 disabled={createMutation.isPending}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                className="w-full gap-2 font-semibold"
               >
                 <KeyRound className="h-4 w-4" />
                 {createMutation.isPending ? 'Verifying Token…' : 'Verify & Save Account'}
-              </button>
+              </Button>
             </div>
           </form>
 
@@ -257,25 +287,29 @@ export const AccountsView = () => {
               ) : null}
 
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => void handleChunkedSync(acc.id)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-xs font-medium text-zinc-200 hover:border-emerald-500/60"
+                  className="gap-1.5"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   Sync Inventory
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="destructive"
+                  size="sm"
                   onClick={() => {
                     setDeleteTarget(acc);
                     setConfirmLabel('');
                   }}
-                  className="inline-flex items-center gap-1 rounded-lg border border-red-900/50 bg-red-950/30 px-2.5 py-1.5 text-xs text-red-300 hover:bg-red-950/60"
+                  className="gap-1.5"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Delete
-                </button>
+                </Button>
               </div>
             </div>
           </BentoCard>
@@ -300,23 +334,25 @@ export const AccountsView = () => {
               className="mt-3 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
             />
             <div className="mt-4 flex justify-end gap-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setDeleteTarget(null)}
-                className="rounded-xl border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="destructive"
+                size="sm"
                 disabled={confirmLabel.trim() !== deleteTarget.label || deleteMutation.isPending}
                 onClick={() =>
                   deleteMutation.mutate({ id: deleteTarget.id, confirm: confirmLabel })
                 }
-                className="rounded-xl bg-red-600 px-3.5 py-1.5 text-xs font-semibold text-white disabled:opacity-40"
               >
                 Confirm Delete
-              </button>
+              </Button>
             </div>
           </div>
         </div>

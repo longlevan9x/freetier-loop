@@ -21,6 +21,7 @@ import {
 import { useState } from 'react';
 import { BentoCard } from '../../../components/bento/BentoCard';
 import { BentoGrid } from '../../../components/bento/BentoGrid';
+import { Button } from '../../../components/ui/button';
 import {
   Select,
   SelectContent,
@@ -344,18 +345,21 @@ export const MigrationsView = () => {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => void handleAutoRecommend()}
               disabled={!resourceId || !sourceAccountId || !targetAccountId}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs text-emerald-300 hover:border-emerald-500/60 disabled:opacity-40"
+              className="gap-1.5 text-emerald-300"
             >
               <Sparkles className="h-3.5 w-3.5" />
               Auto-Select Recommended Strategy
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="button"
+              size="sm"
               disabled={
                 !resourceId ||
                 !sourceAccountId ||
@@ -363,11 +367,11 @@ export const MigrationsView = () => {
                 createAndPlanMutation.isPending
               }
               onClick={() => createAndPlanMutation.mutate()}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 disabled:opacity-40"
+              className="gap-1.5 font-semibold text-zinc-950"
             >
               <Play className="h-3.5 w-3.5" />
               {createAndPlanMutation.isPending ? 'Generating Plan…' : 'Create & Dry-Run Plan'}
-            </button>
+            </Button>
           </div>
 
           {recommendationReason ? (
@@ -390,14 +394,16 @@ export const MigrationsView = () => {
             size={BENTO_SIZE.XL}
             icon={<Terminal className="h-4 w-4" />}
             action={
-              <button
+              <Button
                 type="button"
+                variant="destructive"
+                size="sm"
                 onClick={() => compensateMutation.mutate(activeJob.id)}
-                className="inline-flex items-center gap-1 rounded-lg border border-amber-800/60 bg-amber-950/40 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-900/50"
+                className="gap-1 text-xs"
               >
                 <RotateCcw className="h-3 w-3" />
                 Emergency Rollback
-              </button>
+              </Button>
             }
           >
             {activeJob.status === JOB_STATUS.DRAFT || activeJob.status === JOB_STATUS.PLANNED ? (
@@ -419,17 +425,18 @@ export const MigrationsView = () => {
                     placeholder={activeJob.resourceName}
                     className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-100"
                   />
-                  <button
+                  <Button
                     type="button"
+                    size="sm"
                     disabled={
                       confirmText.trim() !== activeJob.resourceName ||
                       confirmAndRunMutation.isPending
                     }
                     onClick={() => confirmAndRunMutation.mutate(activeJob)}
-                    className="rounded-xl bg-emerald-500 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 disabled:opacity-40"
+                    className="font-semibold text-zinc-950"
                   >
                     {confirmAndRunMutation.isPending ? 'Running Steps…' : 'Confirm & Execute'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : null}
@@ -509,17 +516,18 @@ export const MigrationsView = () => {
                           </div>
                         ))}
 
-                        <button
+                        <Button
                           type="button"
+                          size="sm"
                           disabled={manualStepMutation.isPending}
                           onClick={() =>
                             manualStepMutation.mutate({ jobId: activeJob.id, stepId: step.id })
                           }
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-zinc-950"
+                          className="gap-1.5 font-semibold text-zinc-950"
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Confirm Completed & Continue
-                        </button>
+                        </Button>
                       </div>
                     ) : null}
                   </div>

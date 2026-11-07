@@ -165,7 +165,7 @@ export const RootLayout = () => {
           <button
             type="button"
             onClick={() => setPaletteOpen(true)}
-            className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200"
+            className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200 cursor-pointer"
           >
             <span className="flex items-center gap-2">
               <Command className="h-3.5 w-3.5" />
@@ -190,7 +190,7 @@ export const RootLayout = () => {
                 type="button"
                 title="Sign Out"
                 onClick={() => void handleSignOut()}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-red-950/40 hover:text-red-400"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:bg-red-950/40 hover:text-red-400 cursor-pointer"
               >
                 <LogOut className="h-4 w-4" />
               </button>
@@ -233,7 +233,7 @@ export const RootLayout = () => {
                     setPaletteOpen(false);
                     void navigate({ to: item.to });
                   }}
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800 cursor-pointer"
                 >
                   <span className="flex items-center gap-2.5">
                     {item.icon}

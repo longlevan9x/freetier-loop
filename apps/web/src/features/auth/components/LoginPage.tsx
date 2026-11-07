@@ -5,6 +5,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { ArrowRightLeft, Lock, ShieldCheck } from 'lucide-react';
 import { type FormEvent, useRef, useState } from 'react';
 import { z } from 'zod';
+import { Button } from '../../../components/ui/button';
 import { webEnv } from '../../../config/env';
 import { signInWithTurnstile } from '../../../lib/auth-client';
 import { formatApiError } from '../../../lib/error-messages';
@@ -144,14 +145,14 @@ export const LoginPage = () => {
             </div>
           ) : null}
 
-          <button
+          <Button
             type="submit"
             disabled={!captchaToken || signInMutation.isPending}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full h-11 text-sm font-semibold text-zinc-950"
           >
             <Lock className="h-4 w-4" />
             {signInMutation.isPending ? 'Verifying & Signing In…' : 'Sign In to Console'}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

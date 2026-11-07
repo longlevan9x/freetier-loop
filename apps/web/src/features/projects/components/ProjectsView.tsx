@@ -11,6 +11,7 @@ import { ArrowRightLeft, Database, KeyRound, Pause, Play, Server } from 'lucide-
 import { useState } from 'react';
 import { BentoCard } from '../../../components/bento/BentoCard';
 import { BentoGrid } from '../../../components/bento/BentoGrid';
+import { Button } from '../../../components/ui/button';
 import { queryKeys } from '../../../lib/query-keys';
 import { apiClient } from '../../../lib/rpc';
 
@@ -118,7 +119,7 @@ export const ProjectsView = () => {
                     <button
                       type="button"
                       onClick={() => setSelectedProjectId(proj.id)}
-                      className="text-left"
+                      className="text-left cursor-pointer"
                     >
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-zinc-100">{proj.name}</span>
@@ -139,25 +140,29 @@ export const ProjectsView = () => {
 
                     <div className="flex items-center gap-1.5">
                       {isPaused ? (
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           onClick={() => restoreMutation.mutate(proj.id)}
                           disabled={restoreMutation.isPending}
-                          className="inline-flex items-center gap-1 rounded-lg border border-emerald-700/60 bg-emerald-950/40 px-2.5 py-1 text-xs text-emerald-300 hover:bg-emerald-900/50"
+                          className="gap-1 h-7 text-xs border-emerald-700/60 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50"
                         >
                           <Play className="h-3 w-3" />
                           Restore
-                        </button>
+                        </Button>
                       ) : (
-                        <button
+                        <Button
                           type="button"
+                          variant="outline"
+                          size="sm"
                           onClick={() => pauseMutation.mutate(proj.id)}
                           disabled={pauseMutation.isPending}
-                          className="inline-flex items-center gap-1 rounded-lg border border-amber-700/60 bg-amber-950/40 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-900/50"
+                          className="gap-1 h-7 text-xs border-amber-700/60 bg-amber-950/40 text-amber-300 hover:bg-amber-900/50"
                         >
                           <Pause className="h-3 w-3" />
                           Pause Slot
-                        </button>
+                        </Button>
                       )}
                       <Link
                         to={WEB_ROUTES.MIGRATIONS}
@@ -195,7 +200,7 @@ export const ProjectsView = () => {
                     <button
                       type="button"
                       onClick={() => setSelectedProjectId(proj.id)}
-                      className="text-left"
+                      className="text-left cursor-pointer"
                     >
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-zinc-100">{proj.name}</span>
