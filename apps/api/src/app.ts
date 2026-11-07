@@ -110,10 +110,14 @@ export const createApp = (customDeps?: Deps) => {
       stack: err.stack,
     });
 
+    const isDev = c.var.deps?.config.NODE_ENV !== 'production';
+    const message = isDev && err?.message ? err.message : 'An unexpected error occurred';
+
     const body: ErrorEnvelope = {
       error: {
         code: ERROR_CODE.INTERNAL_ERROR,
-        message: 'An unexpected error occurred',
+        message,
+        ...(isDev && err?.stack ? { details: { stack: err.stack, name: err.name } } : {}),
         requestId,
       },
     };

@@ -10,6 +10,7 @@ import {
 } from '@freetier-loop/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertCircle,
   AlertTriangle,
   CheckCircle2,
   Cloud,
@@ -49,6 +50,7 @@ export const AccountsView = () => {
   const [apiToken, setApiToken] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [syncProgress, setSyncProgress] = useState<Record<string, string>>({});
+  const [syncingAccounts, setSyncingAccounts] = useState<Record<string, boolean>>({});
   const [deleteTarget, setDeleteTarget] = useState<ProviderAccountDto | null>(null);
   const [confirmLabel, setConfirmLabel] = useState('');
   const [syncingAll, setSyncingAll] = useState(false);
@@ -92,7 +94,9 @@ export const AccountsView = () => {
   });
 
   const handleChunkedSync = async (accountId: string) => {
-    setSyncProgress((prev) => ({ ...prev, [accountId]: 'Syncing chunk 1…' }));
+    if (syncingAccounts[accountId]) return;
+    setSyncingAccounts((prev) => ({ ...prev, [accountId]: true }));
+    setSyncProgress((prev) => ({ ...prev, [accountId]: 'Đang đồng bộ phần 1…' }));
     let cursor: string | undefined;
     let total = 0;
     let chunkIndex = 1;
@@ -102,7 +106,10 @@ export const AccountsView = () => {
           param: { id: accountId },
           query: cursor ? { cursor } : {},
         });
-        if (!res.ok) break;
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => null);
+          throw errBody ?? new Error('Sync failed');
+        }
         const json = await res.json();
         total += json.data.syncedCount;
         cursor = json.data.nextCursor ?? undefined;
@@ -110,17 +117,19 @@ export const AccountsView = () => {
         if (cursor) {
           setSyncProgress((prev) => ({
             ...prev,
-            [accountId]: `Synced ${total} items (fetching chunk ${chunkIndex}…)`,
+            [accountId]: `Đã quét ${total} mục (lấy phần ${chunkIndex}…)`,
           }));
         }
       } while (cursor);
 
-      setSyncProgress((prev) => ({ ...prev, [accountId]: `Synced ${total} resources` }));
+      setSyncProgress((prev) => ({ ...prev, [accountId]: `Đã đồng bộ ${total} tài nguyên` }));
       void queryClient.invalidateQueries({ queryKey: queryKeys.providerAccounts.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.resources.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
     } catch {
-      setSyncProgress((prev) => ({ ...prev, [accountId]: 'Sync error' }));
+      setSyncProgress((prev) => ({ ...prev, [accountId]: 'Đồng bộ thất bại' }));
+    } finally {
+      setSyncingAccounts((prev) => ({ ...prev, [accountId]: false }));
     }
   };
 
@@ -128,10 +137,13 @@ export const AccountsView = () => {
     const accounts = accountsQuery.data ?? [];
     if (accounts.length === 0 || syncingAll) return;
     setSyncingAll(true);
-    for (const acc of accounts) {
-      await handleChunkedSync(acc.id);
+    try {
+      for (const acc of accounts) {
+        await handleChunkedSync(acc.id);
+      }
+    } finally {
+      setSyncingAll(false);
     }
-    setSyncingAll(false);
   };
 
   const deleteMutation = useMutation({
@@ -312,18 +324,39 @@ export const AccountsView = () => {
                   )}
                 </div>
 
-                {syncProgress[acc.id] ? (
-                  <div className="flex items-center gap-1.5 text-xs text-emerald-400">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    {syncProgress[acc.id]}
-                  </div>
-                ) : null}
+                {(() => {
+                  const progress = syncProgress[acc.id];
+                  if (!progress) return null;
+                  const isFailed = progress.includes('thất bại');
+                  const isSyncing = syncingAccounts[acc.id];
+                  return (
+                    <div
+                      className={`flex items-center gap-1.5 text-xs ${
+                        isFailed
+                          ? 'text-red-400'
+                          : isSyncing
+                            ? 'text-amber-400'
+                            : 'text-emerald-400'
+                      }`}
+                    >
+                      {isSyncing ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      ) : isFailed ? (
+                        <AlertCircle className="h-3.5 w-3.5" />
+                      ) : (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      )}
+                      {progress}
+                    </div>
+                  );
+                })()}
 
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <Button
                     type="button"
                     variant={isNeverSynced ? 'default' : 'outline'}
                     size="sm"
+                    disabled={Boolean(syncingAccounts[acc.id]) || syncingAll}
                     onClick={() => void handleChunkedSync(acc.id)}
                     className={
                       isNeverSynced
@@ -332,9 +365,13 @@ export const AccountsView = () => {
                     }
                   >
                     <RefreshCw
-                      className={`h-3.5 w-3.5 ${syncProgress[acc.id] ? 'animate-spin' : ''}`}
+                      className={`h-3.5 w-3.5 ${syncingAccounts[acc.id] ? 'animate-spin' : ''}`}
                     />
-                    {isNeverSynced ? 'Đồng bộ tài nguyên ngay' : 'Sync Inventory'}
+                    {syncingAccounts[acc.id]
+                      ? 'Đang đồng bộ…'
+                      : isNeverSynced
+                        ? 'Đồng bộ tài nguyên ngay'
+                        : 'Sync Inventory'}
                   </Button>
                   <Button
                     type="button"

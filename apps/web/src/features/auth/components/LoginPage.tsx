@@ -248,18 +248,7 @@ export const LoginPage = () => {
                 />
               </div>
 
-              <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/60 p-3">
-                <div className="mb-2 flex items-center justify-between text-xs text-zinc-400">
-                  <span className="flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                    Cloudflare Turnstile Verification
-                  </span>
-                  {captchaToken ? (
-                    <span className="text-emerald-400 font-medium">Verified</span>
-                  ) : (
-                    <span>Required</span>
-                  )}
-                </div>
+              <div className="flex justify-center py-1">
                 {webEnv.VITE_TURNSTILE_SITE_KEY ? (
                   <Turnstile
                     ref={turnstileRef}
@@ -268,9 +257,7 @@ export const LoginPage = () => {
                     onExpire={() => setCaptchaToken('')}
                   />
                 ) : (
-                  <p className="text-xs text-amber-400">
-                    Missing VITE_TURNSTILE_SITE_KEY in apps/web/.env
-                  </p>
+                  <p className="text-xs text-amber-400">Missing VITE_TURNSTILE_SITE_KEY in .env</p>
                 )}
               </div>
 

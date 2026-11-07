@@ -21,11 +21,13 @@ Single-admin control plane to monitor quotas and safely migrate domains, DNS zon
    ```bash
    pnpm install
    ```
-2. **Configure local environment:**
+2. **Configure local environment (ngay tại thư mục gốc):**
    ```bash
    cp .dev.vars.example .dev.vars
-   cp apps/web/.env.example apps/web/.env
+   cp .env.example .env
    ```
+   > - `.dev.vars`: Cấu hình secrets cho Backend API (Cloudflare Worker).
+   > - `.env`: Cấu hình client cho Frontend (Vite tự động đọc từ thư mục gốc).
 3. **Run local migration & seed admin account:**
    ```bash
    pnpm db:migrate:local

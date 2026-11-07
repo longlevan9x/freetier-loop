@@ -10,6 +10,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowRightLeft,
   CheckCircle2,
@@ -53,6 +54,7 @@ export const ProjectsView = () => {
   const [search, setSearch] = useState('');
   const [providerFilter, setProviderFilter] = useState<'all' | 'vercel' | 'supabase'>('all');
   const [syncProgress, setSyncProgress] = useState<Record<string, string>>({});
+  const [syncingAccounts, setSyncingAccounts] = useState<Record<string, boolean>>({});
 
   const vercelQuery = useQuery({
     queryKey: queryKeys.resources.list({ kind: RESOURCE_KIND.VERCEL_PROJECT }),
@@ -129,7 +131,9 @@ export const ProjectsView = () => {
   });
 
   const handleChunkedSync = async (accountId: string) => {
-    setSyncProgress((prev) => ({ ...prev, [accountId]: 'Đang quét…' }));
+    if (syncingAccounts[accountId]) return;
+    setSyncingAccounts((prev) => ({ ...prev, [accountId]: true }));
+    setSyncProgress((prev) => ({ ...prev, [accountId]: 'Đang quét tài nguyên…' }));
     let cursor: string | undefined;
     try {
       do {
@@ -137,17 +141,22 @@ export const ProjectsView = () => {
           param: { id: accountId },
           query: cursor ? { cursor } : {},
         });
-        if (!res.ok) break;
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => null);
+          throw errBody ?? new Error('Sync failed');
+        }
         const json = await res.json();
         cursor = json.data.nextCursor ?? undefined;
       } while (cursor);
 
-      setSyncProgress((prev) => ({ ...prev, [accountId]: 'Hoàn tất' }));
+      setSyncProgress((prev) => ({ ...prev, [accountId]: 'Đã đồng bộ thành công' }));
       void queryClient.invalidateQueries({ queryKey: queryKeys.providerAccounts.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.resources.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
     } catch {
-      setSyncProgress((prev) => ({ ...prev, [accountId]: 'Lỗi' }));
+      setSyncProgress((prev) => ({ ...prev, [accountId]: 'Đồng bộ thất bại' }));
+    } finally {
+      setSyncingAccounts((prev) => ({ ...prev, [accountId]: false }));
     }
   };
 
@@ -378,12 +387,32 @@ export const ProjectsView = () => {
               >
                 <div className="space-y-3 pt-1">
                   {/* Sync status / progress message */}
-                  {syncProgress[acc.id] ? (
-                    <div className="flex items-center gap-1.5 text-xs text-emerald-400">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {syncProgress[acc.id]}
-                    </div>
-                  ) : null}
+                  {(() => {
+                    const progress = syncProgress[acc.id];
+                    if (!progress) return null;
+                    const isFailed = progress.includes('thất bại');
+                    const isSyncing = syncingAccounts[acc.id];
+                    return (
+                      <div
+                        className={`flex items-center gap-1.5 text-xs ${
+                          isFailed
+                            ? 'text-red-400'
+                            : isSyncing
+                              ? 'text-amber-400'
+                              : 'text-emerald-400'
+                        }`}
+                      >
+                        {isSyncing ? (
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        ) : isFailed ? (
+                          <AlertCircle className="h-3.5 w-3.5" />
+                        ) : (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        )}
+                        {progress}
+                      </div>
+                    );
+                  })()}
 
                   {/* Empty state per account */}
                   {projects.length === 0 ? (
@@ -398,11 +427,14 @@ export const ProjectsView = () => {
                           type="button"
                           variant="outline"
                           size="sm"
+                          disabled={Boolean(syncingAccounts[acc.id])}
                           onClick={() => void handleChunkedSync(acc.id)}
                           className="gap-1.5 border-amber-500/50 text-amber-300 hover:bg-amber-950/30 text-xs"
                         >
-                          <RefreshCw className="h-3 w-3" />
-                          Đồng bộ tài nguyên ngay
+                          <RefreshCw
+                            className={`h-3 w-3 ${syncingAccounts[acc.id] ? 'animate-spin' : ''}`}
+                          />
+                          {syncingAccounts[acc.id] ? 'Đang đồng bộ…' : 'Đồng bộ tài nguyên ngay'}
                         </Button>
                       ) : null}
                     </div>

@@ -192,20 +192,32 @@ export class AuthService {
     const form = new URLSearchParams();
     form.set('secret', this.config.TURNSTILE_SECRET_KEY);
     form.set('response', token);
-    if (ip) {
+    if (ip && ip !== '127.0.0.1' && ip !== '::1' && ip !== 'localhost') {
       form.set('remoteip', ip);
     }
 
-    const res = await this.fetchFn('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      body: form,
-    });
+    let res: Response;
+    try {
+      res = await this.fetchFn('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        body: form,
+      });
+    } catch (err) {
+      throw new AppError(
+        ERROR_CODE.AUTH_CAPTCHA_FAILED,
+        `Turnstile upstream connection error: ${err instanceof Error ? err.message : 'network failed'}`,
+      );
+    }
     if (!res.ok) {
       throw new AppError(ERROR_CODE.AUTH_CAPTCHA_FAILED, 'Turnstile upstream error');
     }
-    const payload = (await res.json()) as { success?: boolean };
+    const payload = (await res.json()) as { success?: boolean; 'error-codes'?: string[] };
     if (!payload.success) {
-      throw new AppError(ERROR_CODE.AUTH_CAPTCHA_FAILED, 'Turnstile verification failed');
+      const errorCodes = payload['error-codes']?.join(', ') ?? 'verification failed';
+      throw new AppError(
+        ERROR_CODE.AUTH_CAPTCHA_FAILED,
+        `Turnstile verification failed: ${errorCodes}`,
+      );
     }
   }
 
