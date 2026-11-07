@@ -1,7 +1,21 @@
-import { BENTO_SIZE, RESOURCE_KIND, type ResourceDto, WEB_ROUTES } from '@freetier-loop/shared';
+import {
+  BENTO_SIZE,
+  PROVIDER,
+  RESOURCE_KIND,
+  type ResourceDto,
+  WEB_ROUTES,
+} from '@freetier-loop/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { ArrowRightLeft, Camera, Globe, Search, Shield } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  Camera,
+  Globe,
+  RefreshCw,
+  Search,
+  Shield,
+} from 'lucide-react';
 import { useState } from 'react';
 import { BentoCard } from '../../../components/bento/BentoCard';
 import { BentoGrid } from '../../../components/bento/BentoGrid';
@@ -60,10 +74,23 @@ export const DomainsView = () => {
     },
   });
 
+  const accountsQuery = useQuery({
+    queryKey: queryKeys.providerAccounts.all,
+    queryFn: async () => {
+      const res = await apiClient.api.v1['provider-accounts'].$get();
+      if (!res.ok) throw new Error('Failed to load accounts');
+      const json = await res.json();
+      return json.data;
+    },
+  });
+
   const zones: ResourceDto[] = zonesQuery.data ?? [];
   const children: ResourceDto[] = detailQuery.data?.children ?? [];
   const pageSize = 100;
   const visibleRecords = children.slice(recordPage * pageSize, (recordPage + 1) * pageSize);
+
+  const hasCfAccount = (accountsQuery.data ?? []).some((a) => a.provider === PROVIDER.CLOUDFLARE);
+  const needsSync = hasCfAccount && zones.length === 0 && !zonesQuery.isPending && !search;
 
   return (
     <div className="space-y-6">
@@ -86,6 +113,34 @@ export const DomainsView = () => {
           />
         </div>
       </div>
+
+      {needsSync ? (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-950/25 p-5 shadow-lg shadow-amber-950/20 backdrop-blur">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <span className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 mt-0.5">
+                <AlertTriangle className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-100">
+                  Bạn đã kết nối tài khoản Cloudflare nhưng chưa quét tài nguyên
+                </h3>
+                <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
+                  Danh sách tên miền (Zones) và bản ghi DNS đang trống vì chưa được đồng bộ từ
+                  Cloudflare API về hệ thống.
+                </p>
+              </div>
+            </div>
+            <Link
+              to={WEB_ROUTES.ACCOUNTS}
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Bấm vào đây để đồng bộ ngay
+            </Link>
+          </div>
+        </div>
+      ) : null}
 
       {snapshotStatus ? (
         <div className="rounded-xl border border-emerald-800/60 bg-emerald-950/40 px-4 py-2.5 text-xs text-emerald-300">

@@ -1,5 +1,6 @@
 import {
   BENTO_SIZE,
+  PROVIDER,
   RESOURCE_KIND,
   type ResourceDto,
   SUPABASE_PROJECT_STATUS,
@@ -7,7 +8,16 @@ import {
 } from '@freetier-loop/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { ArrowRightLeft, Database, KeyRound, Pause, Play, Server } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  Database,
+  KeyRound,
+  Pause,
+  Play,
+  RefreshCw,
+  Server,
+} from 'lucide-react';
 import { useState } from 'react';
 import { BentoCard } from '../../../components/bento/BentoCard';
 import { BentoGrid } from '../../../components/bento/BentoGrid';
@@ -83,9 +93,29 @@ export const ProjectsView = () => {
     },
   });
 
+  const accountsQuery = useQuery({
+    queryKey: queryKeys.providerAccounts.all,
+    queryFn: async () => {
+      const res = await apiClient.api.v1['provider-accounts'].$get();
+      if (!res.ok) throw new Error('Failed to load accounts');
+      const json = await res.json();
+      return json.data;
+    },
+  });
+
   const vercelProjects: ResourceDto[] = vercelQuery.data ?? [];
   const supabaseProjects: ResourceDto[] = supabaseQuery.data ?? [];
   const children: ResourceDto[] = detailQuery.data?.children ?? [];
+
+  const hasAppAccount = (accountsQuery.data ?? []).some(
+    (a) => a.provider === PROVIDER.VERCEL || a.provider === PROVIDER.SUPABASE,
+  );
+  const needsSync =
+    hasAppAccount &&
+    vercelProjects.length === 0 &&
+    supabaseProjects.length === 0 &&
+    !vercelQuery.isPending &&
+    !supabaseQuery.isPending;
 
   return (
     <div className="space-y-6">
@@ -95,6 +125,34 @@ export const ProjectsView = () => {
           Manage Vercel deployments (Hobby & Team) and Supabase PostgreSQL + Edge Function projects.
         </p>
       </div>
+
+      {needsSync ? (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-950/25 p-5 shadow-lg shadow-amber-950/20 backdrop-blur">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <span className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 mt-0.5">
+                <AlertTriangle className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-100">
+                  Bạn đã kết nối tài khoản Vercel / Supabase nhưng chưa quét tài nguyên
+                </h3>
+                <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
+                  Danh sách dự án và biến môi trường đang trống vì chưa được đồng bộ từ Vercel và
+                  Supabase API về hệ thống.
+                </p>
+              </div>
+            </div>
+            <Link
+              to={WEB_ROUTES.ACCOUNTS}
+              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-semibold text-zinc-950 transition hover:bg-amber-400"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Bấm vào đây để đồng bộ ngay
+            </Link>
+          </div>
+        </div>
+      ) : null}
 
       <BentoGrid>
         <BentoCard

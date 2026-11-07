@@ -9,7 +9,15 @@ import {
   createProviderAccountSchema,
 } from '@freetier-loop/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Cloud, KeyRound, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Cloud,
+  KeyRound,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { BentoCard } from '../../../components/bento/BentoCard';
 import { BentoGrid } from '../../../components/bento/BentoGrid';
@@ -252,68 +260,100 @@ export const AccountsView = () => {
           ) : null}
         </BentoCard>
 
-        {(accountsQuery.data ?? []).map((acc) => (
-          <BentoCard
-            key={acc.id}
-            title={acc.label}
-            subtitle={`${PROVIDER_LABEL[acc.provider]} · Token ••••${acc.tokenLast4}${acc.accountType ? ` · ${acc.accountType.toUpperCase()}` : ''}`}
-            size={BENTO_SIZE.MD}
-            icon={<Cloud className="h-4 w-4" />}
-            action={
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                  acc.status === ACCOUNT_STATUS.ACTIVE
-                    ? 'bg-emerald-500/15 text-emerald-400'
-                    : 'bg-amber-500/15 text-amber-400'
-                }`}
-              >
-                {acc.status}
-              </span>
-            }
-          >
-            <div className="space-y-3 pt-1">
-              <div className="text-xs text-zinc-400">
-                External ID:{' '}
-                <span className="font-mono text-zinc-300">
-                  {acc.externalAccountId ?? 'verified'}
-                </span>
-              </div>
-
-              {syncProgress[acc.id] ? (
-                <div className="flex items-center gap-1.5 text-xs text-emerald-400">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  {syncProgress[acc.id]}
+        {(accountsQuery.data ?? []).map((acc) => {
+          const isNeverSynced = !acc.lastSyncedAt;
+          return (
+            <BentoCard
+              key={acc.id}
+              title={acc.label}
+              subtitle={`${PROVIDER_LABEL[acc.provider]} · Token ••••${acc.tokenLast4}${acc.accountType ? ` · ${acc.accountType.toUpperCase()}` : ''}`}
+              size={BENTO_SIZE.MD}
+              icon={<Cloud className="h-4 w-4" />}
+              action={
+                <div className="flex items-center gap-1.5">
+                  {isNeverSynced ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300 animate-pulse">
+                      <AlertTriangle className="h-3 w-3" />
+                      Chưa đồng bộ
+                    </span>
+                  ) : null}
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                      acc.status === ACCOUNT_STATUS.ACTIVE
+                        ? 'bg-emerald-500/15 text-emerald-400'
+                        : 'bg-amber-500/15 text-amber-400'
+                    }`}
+                  >
+                    {acc.status}
+                  </span>
                 </div>
-              ) : null}
+              }
+            >
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between text-xs text-zinc-400">
+                  <div>
+                    External ID:{' '}
+                    <span className="font-mono text-zinc-300">
+                      {acc.externalAccountId ?? 'verified'}
+                    </span>
+                  </div>
+                  {acc.lastSyncedAt ? (
+                    <span className="text-[11px] text-zinc-500">
+                      Đã sync:{' '}
+                      {new Date(acc.lastSyncedAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-amber-400 font-medium">
+                      Cần quét tài nguyên
+                    </span>
+                  )}
+                </div>
 
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void handleChunkedSync(acc.id)}
-                  className="gap-1.5"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Sync Inventory
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    setDeleteTarget(acc);
-                    setConfirmLabel('');
-                  }}
-                  className="gap-1.5"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Delete
-                </Button>
+                {syncProgress[acc.id] ? (
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {syncProgress[acc.id]}
+                  </div>
+                ) : null}
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant={isNeverSynced ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => void handleChunkedSync(acc.id)}
+                    className={
+                      isNeverSynced
+                        ? 'gap-1.5 bg-amber-500 text-zinc-950 hover:bg-amber-400 font-semibold shadow-md shadow-amber-500/20'
+                        : 'gap-1.5'
+                    }
+                  >
+                    <RefreshCw
+                      className={`h-3.5 w-3.5 ${syncProgress[acc.id] ? 'animate-spin' : ''}`}
+                    />
+                    {isNeverSynced ? 'Đồng bộ tài nguyên ngay' : 'Sync Inventory'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      setDeleteTarget(acc);
+                      setConfirmLabel('');
+                    }}
+                    className="gap-1.5"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete
+                  </Button>
+                </div>
               </div>
-            </div>
-          </BentoCard>
-        ))}
+            </BentoCard>
+          );
+        })}
       </BentoGrid>
 
       {deleteTarget ? (
