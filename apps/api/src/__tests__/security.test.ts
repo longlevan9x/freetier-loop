@@ -1,11 +1,40 @@
 import { describe, expect, it } from 'vitest';
 import { createSecretCipher } from '../platform/crypto';
 import { createNativeScryptHasher } from '../platform/password-hasher';
+import {
+  generateOtpAuthUri,
+  generateTotpCode,
+  generateTotpSecret,
+  verifyTotpCode,
+} from '../platform/totp';
 
 const KEY_V1 = Buffer.alloc(32, 1).toString('base64');
 const KEY_V2 = Buffer.alloc(32, 2).toString('base64');
 
-describe('Security primitives (T-030 & T-039)', () => {
+describe('Security primitives (T-030, T-039 & T-132)', () => {
+  it('generates and verifies TOTP codes correctly with clock skew tolerance', async () => {
+    const secret = generateTotpSecret();
+    expect(secret.length).toBeGreaterThanOrEqual(16);
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const code = await generateTotpCode(secret, nowSeconds);
+    expect(code).toMatch(/^\d{6}$/);
+
+    // Exact time
+    expect(await verifyTotpCode(secret, code, nowSeconds)).toBe(true);
+
+    // Within 30 seconds window
+    expect(await verifyTotpCode(secret, code, nowSeconds + 25)).toBe(true);
+    expect(await verifyTotpCode(secret, code, nowSeconds - 25)).toBe(true);
+
+    // Invalid code
+    expect(await verifyTotpCode(secret, '000000', nowSeconds)).toBe(false);
+
+    // URI format
+    const uri = generateOtpAuthUri('admin@example.com', secret);
+    expect(uri).toContain('otpauth://totp/freetier-loop:admin%40example.com');
+    expect(uri).toContain(`secret=${secret}`);
+  });
   it('hashes and verifies passwords rapidly using native scrypt', async () => {
     const hasher = createNativeScryptHasher();
     await hasher.hash('warmup');
