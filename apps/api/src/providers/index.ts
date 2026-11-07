@@ -1,0 +1,18 @@
+import { CloudflareAdapter } from './cloudflare/cloudflare.adapter';
+import { ProviderRegistry } from './registry';
+import { SupabaseAdapter } from './supabase/supabase.adapter';
+import { VercelAdapter } from './vercel/vercel.adapter';
+
+export * from './contracts';
+export * from './http-client';
+export * from './registry';
+export * from './cloudflare/cloudflare.adapter';
+export * from './vercel/vercel.adapter';
+export * from './supabase/supabase.adapter';
+
+export const createDefaultProviderRegistry = (): ProviderRegistry => {
+  return new ProviderRegistry()
+    .register(new CloudflareAdapter())
+    .register(new VercelAdapter())
+    .register(new SupabaseAdapter());
+};

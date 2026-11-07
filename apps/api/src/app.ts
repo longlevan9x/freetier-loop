@@ -1,5 +1,6 @@
-﻿import {
+import {
   API_PREFIX,
+  AUTH_PREFIX,
   AppError,
   ERROR_CODE,
   type ErrorEnvelope,
@@ -9,7 +10,15 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
+import { requireAuthMiddleware, sessionLoaderMiddleware } from './middleware/require-auth';
+import { createAuditRoutes } from './modules/audit/audit.routes';
+import { createAuthRoutes } from './modules/auth/auth.routes';
+import { createDashboardRoutes } from './modules/dashboard/dashboard.routes';
 import { createHealthRoutes } from './modules/health/health.routes';
+import { createJobsRoutes } from './modules/jobs/jobs.routes';
+import { createProviderAccountsRoutes } from './modules/provider-accounts/provider-accounts.routes';
+import { createResourcesRoutes } from './modules/resources/resources.routes';
+import { createSnapshotsRoutes } from './modules/snapshots/snapshots.routes';
 import { type Deps, createDefaultDeps } from './platform/deps';
 import type { AppEnv } from './types';
 
@@ -57,8 +66,18 @@ export const createApp = (customDeps?: Deps) => {
     return middleware(c, next);
   });
 
-  const v1 = new Hono<AppEnv>().route('/', createHealthRoutes());
-  const routes = app.route(API_PREFIX, v1);
+  app.use(`${API_PREFIX}/*`, sessionLoaderMiddleware, requireAuthMiddleware);
+
+  const v1 = new Hono<AppEnv>()
+    .route('/', createHealthRoutes())
+    .route('/', createDashboardRoutes())
+    .route('/', createProviderAccountsRoutes())
+    .route('/', createResourcesRoutes())
+    .route('/', createSnapshotsRoutes())
+    .route('/', createJobsRoutes())
+    .route('/', createAuditRoutes());
+
+  const routes = app.route(AUTH_PREFIX, createAuthRoutes()).route(API_PREFIX, v1);
 
   app.notFound((c) => {
     const body: ErrorEnvelope = {

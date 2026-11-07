@@ -1,4 +1,4 @@
-﻿import { API_PREFIX, API_ROUTES, ERROR_CODE, HEADER, HTTP_STATUS } from '@freetier-loop/shared';
+import { API_PREFIX, API_ROUTES, ERROR_CODE, HEADER, HTTP_STATUS } from '@freetier-loop/shared';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../app';
 import { createDefaultDeps } from '../platform/deps';
@@ -33,7 +33,7 @@ describe('@freetier-loop/api app skeleton', () => {
 
   it('returns standard error envelope on 404 Not Found', async () => {
     const app = createApp();
-    const res = await app.request('/api/v1/does-not-exist');
+    const res = await app.request('/api/does-not-exist');
 
     expect(res.status).toBe(HTTP_STATUS.NOT_FOUND);
     const json = (await res.json()) as { error: { code: string; requestId: string } };

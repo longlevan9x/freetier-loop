@@ -1,17 +1,74 @@
-﻿import { BENTO_SIZE, PROVIDER_LABEL, WEB_ROUTES } from '@freetier-loop/shared';
-import { useQuery } from '@tanstack/react-query';
-import { Link, Outlet, createRootRoute, createRoute, createRouter } from '@tanstack/react-router';
-import { Activity, ArrowRightLeft, Cloud, Database, Globe, ShieldCheck } from 'lucide-react';
+import { BENTO_SIZE, WEB_ROUTES } from '@freetier-loop/shared';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  Link,
+  Outlet,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  useNavigate,
+} from '@tanstack/react-router';
+import { ArrowRightLeft, Command, LogOut } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { BentoCard } from '../components/bento/BentoCard';
 import { BentoGrid } from '../components/bento/BentoGrid';
+import { AccountsView } from '../features/accounts/components/AccountsView';
+import { AuditLogsView } from '../features/audit/components/AuditLogsView';
+import { LoginPage } from '../features/auth/components/LoginPage';
+import { DashboardView } from '../features/dashboard/components/DashboardView';
+import { DomainsView } from '../features/domains/components/DomainsView';
+import { MigrationsView } from '../features/migrations/components/MigrationsView';
+import { ProjectsView } from '../features/projects/components/ProjectsView';
+import { SettingsView } from '../features/settings/components/SettingsView';
+import { SnapshotsView } from '../features/snapshots/components/SnapshotsView';
+import { fetchCurrentSession, signOutSession } from '../lib/auth-client';
 import { queryKeys } from '../lib/query-keys';
-import { apiClient } from '../lib/rpc';
 
-const RootLayout = () => {
+const NAV_ITEMS = [
+  { label: 'Dashboard', to: WEB_ROUTES.DASHBOARD },
+  { label: 'Accounts', to: WEB_ROUTES.ACCOUNTS },
+  { label: 'Domains', to: WEB_ROUTES.DOMAINS },
+  { label: 'Projects', to: WEB_ROUTES.PROJECTS },
+  { label: 'Migrations', to: WEB_ROUTES.MIGRATIONS },
+  { label: 'Snapshots', to: WEB_ROUTES.SNAPSHOTS },
+  { label: 'Audit Logs', to: WEB_ROUTES.AUDIT_LOGS },
+  { label: 'Settings', to: WEB_ROUTES.SETTINGS },
+] as const;
+
+export const RootLayout = () => {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  const sessionQuery = useQuery({
+    queryKey: queryKeys.session.current,
+    queryFn: fetchCurrentSession,
+    retry: false,
+  });
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((prev) => !prev);
+      } else if (e.key === 'Escape') {
+        setPaletteOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const handleSignOut = async () => {
+    await signOutSession();
+    queryClient.setQueryData(queryKeys.session.current, null);
+    await navigate({ to: WEB_ROUTES.LOGIN });
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
       <header className="border-b border-zinc-800/80 bg-zinc-900/50 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-3">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400">
               <ArrowRightLeft className="h-4 w-4" />
@@ -23,193 +80,172 @@ const RootLayout = () => {
               </span>
             </div>
           </div>
-          <nav className="flex items-center gap-5 text-sm text-zinc-400">
-            <Link
-              to={WEB_ROUTES.DASHBOARD}
-              className="transition-colors hover:text-zinc-100 [&.active]:text-emerald-400"
-            >
-              Dashboard
-            </Link>
-            <Link
-              to={WEB_ROUTES.ACCOUNTS}
-              className="transition-colors hover:text-zinc-100 [&.active]:text-emerald-400"
-            >
-              Accounts
-            </Link>
-            <Link
-              to={WEB_ROUTES.DOMAINS}
-              className="transition-colors hover:text-zinc-100 [&.active]:text-emerald-400"
-            >
-              Domains
-            </Link>
-            <Link
-              to={WEB_ROUTES.PROJECTS}
-              className="transition-colors hover:text-zinc-100 [&.active]:text-emerald-400"
-            >
-              Projects
-            </Link>
-            <Link
-              to={WEB_ROUTES.MIGRATIONS}
-              className="transition-colors hover:text-zinc-100 [&.active]:text-emerald-400"
-            >
-              Migrations
-            </Link>
+
+          <nav
+            aria-label="Primary navigation"
+            className="flex flex-wrap items-center gap-4 text-sm text-zinc-400"
+          >
+            {NAV_ITEMS.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className="transition-colors hover:text-zinc-100 [&.active]:font-medium [&.active]:text-emerald-400"
+              >
+                {item.label}
+              </Link>
+            ))}
           </nav>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"
+            >
+              <Command className="h-3 w-3" />
+              <span>⌘K</span>
+            </button>
+
+            {sessionQuery.data ? (
+              <button
+                type="button"
+                onClick={() => void handleSignOut()}
+                className="inline-flex items-center gap-1 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs text-zinc-300 hover:border-red-800/60 hover:text-red-300"
+              >
+                <LogOut className="h-3 w-3" />
+                Sign Out
+              </button>
+            ) : (
+              <Link
+                to={WEB_ROUTES.LOGIN}
+                className="rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 py-1 text-xs text-emerald-400 hover:border-emerald-500/60"
+              >
+                Login
+              </Link>
+            )}
+          </div>
         </div>
       </header>
+
       <main className="mx-auto max-w-7xl px-6 py-8">
         <Outlet />
       </main>
+
+      {paletteOpen ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 pt-24 p-4">
+          <dialog
+            open
+            aria-label="Command palette"
+            className="m-0 w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-4 text-zinc-100 shadow-2xl"
+          >
+            <div className="mb-2 flex items-center justify-between text-xs text-zinc-400">
+              <span>Quick Navigation (Esc to close)</span>
+            </div>
+            <div className="space-y-1">
+              {NAV_ITEMS.map((item) => (
+                <button
+                  key={item.to}
+                  type="button"
+                  onClick={() => {
+                    setPaletteOpen(false);
+                    void navigate({ to: item.to });
+                  }}
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800"
+                >
+                  <span>{item.label}</span>
+                  <span className="font-mono text-xs text-zinc-500">{item.to}</span>
+                </button>
+              ))}
+            </div>
+          </dialog>
+        </div>
+      ) : null}
     </div>
   );
 };
 
-const DashboardPage = () => {
-  const healthQuery = useQuery({
-    queryKey: queryKeys.health.all,
-    queryFn: async () => {
-      const res = await apiClient.api.v1.health.$get();
-      if (!res.ok) {
-        throw new Error(`Health check failed: ${res.status}`);
-      }
-      return res.json();
-    },
-  });
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Quota & Migration Overview</h1>
-        <p className="text-sm text-zinc-400">
-          Manage and rotate resources across {PROVIDER_LABEL.cloudflare}, {PROVIDER_LABEL.vercel},
-          and {PROVIDER_LABEL.supabase}.
-        </p>
-      </div>
-
-      <BentoGrid>
-        <BentoCard
-          title="Quota Overview"
-          subtitle="Daily requests & active free-tier slots across accounts"
-          size={BENTO_SIZE.XL}
-          icon={<Cloud className="h-4 w-4" />}
-        >
-          <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-3">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
-              <div className="text-xs text-zinc-400">{PROVIDER_LABEL.cloudflare}</div>
-              <div className="mt-1 text-lg font-semibold">100k req / day</div>
-            </div>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
-              <div className="text-xs text-zinc-400">{PROVIDER_LABEL.vercel}</div>
-              <div className="mt-1 text-lg font-semibold">Hobby & Team</div>
-            </div>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
-              <div className="text-xs text-zinc-400">{PROVIDER_LABEL.supabase}</div>
-              <div className="mt-1 text-lg font-semibold">2 active projects / user</div>
-            </div>
-          </div>
-        </BentoCard>
-
-        <BentoCard
-          title="API Health"
-          subtitle="Hono RPC typed connection"
-          size={BENTO_SIZE.MD}
-          icon={<Activity className="h-4 w-4" />}
-          loading={healthQuery.isPending}
-          error={healthQuery.error instanceof Error ? healthQuery.error.message : null}
-        >
-          <div className="flex items-center gap-2 pt-2">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-            <span className="font-mono text-xs text-zinc-300">
-              status: {healthQuery.data?.data.status ?? 'connecting'}
-            </span>
-          </div>
-        </BentoCard>
-
-        <BentoCard
-          title="Cloudflare Registrar Domains"
-          subtitle="Safe pre-staged DNS & guided transfer"
-          size={BENTO_SIZE.MD}
-          icon={<Globe className="h-4 w-4" />}
-        >
-          <p className="text-xs text-zinc-400">
-            Pre-creates target zone & imports DNS records in a single batch before registrar move.
-          </p>
-        </BentoCard>
-
-        <BentoCard
-          title="Supabase Free-Tier Slots"
-          subtitle="Quick Pause / Restore & Cross-Account Recreate"
-          size={BENTO_SIZE.MD}
-          icon={<Database className="h-4 w-4" />}
-        >
-          <p className="text-xs text-zinc-400">
-            Includes Edge Functions migration, pg_dump helper, row-count verification & ENV_REWIRE.
-          </p>
-        </BentoCard>
-
-        <BentoCard
-          title="Security Guardrails"
-          subtitle="AES-256-GCM & Blue-Green Cutover"
-          size={BENTO_SIZE.MD}
-          icon={<ShieldCheck className="h-4 w-4" />}
-        >
-          <p className="text-xs text-zinc-400">
-            Self-protected admin domain, Turnstile login guard, and encrypted snapshots.
-          </p>
-        </BentoCard>
-      </BentoGrid>
-    </div>
-  );
-};
-
-const PlaceholderPage = ({ title }: { title: string }) => (
+const NotFoundPage = () => (
   <BentoGrid>
-    <BentoCard title={title} size={BENTO_SIZE.FULL}>
-      <p className="text-sm text-zinc-400">{title} module ready for M2/M3 integration.</p>
+    <BentoCard title="404 — Page Not Found" size={BENTO_SIZE.FULL}>
+      <p className="text-sm text-zinc-400">
+        The requested route does not exist.{' '}
+        <Link to={WEB_ROUTES.DASHBOARD} className="text-emerald-400 underline">
+          Return to Dashboard
+        </Link>
+      </p>
     </BentoCard>
   </BentoGrid>
 );
 
 const rootRoute = createRootRoute({
   component: RootLayout,
+  notFoundComponent: NotFoundPage,
+});
+
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: WEB_ROUTES.LOGIN,
+  component: LoginPage,
 });
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.DASHBOARD,
-  component: DashboardPage,
+  component: DashboardView,
 });
 
 const accountsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.ACCOUNTS,
-  component: () => <PlaceholderPage title="Provider Accounts" />,
+  component: AccountsView,
 });
 
 const domainsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.DOMAINS,
-  component: () => <PlaceholderPage title="Domains & DNS Zones" />,
+  component: DomainsView,
 });
 
 const projectsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.PROJECTS,
-  component: () => <PlaceholderPage title="Projects & Databases" />,
+  component: ProjectsView,
 });
 
 const migrationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: WEB_ROUTES.MIGRATIONS,
-  component: () => <PlaceholderPage title="Migration Jobs" />,
+  component: MigrationsView,
+});
+
+const snapshotsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: WEB_ROUTES.SNAPSHOTS,
+  component: SnapshotsView,
+});
+
+const auditLogsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: WEB_ROUTES.AUDIT_LOGS,
+  component: AuditLogsView,
+});
+
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: WEB_ROUTES.SETTINGS,
+  component: SettingsView,
 });
 
 const routeTree = rootRoute.addChildren([
+  loginRoute,
   indexRoute,
   accountsRoute,
   domainsRoute,
   projectsRoute,
   migrationsRoute,
+  snapshotsRoute,
+  auditLogsRoute,
+  settingsRoute,
 ]);
 
 export const router = createRouter({ routeTree });

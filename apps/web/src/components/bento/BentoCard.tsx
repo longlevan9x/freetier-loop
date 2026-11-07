@@ -17,7 +17,7 @@ export type BentoCardProps = {
   action?: ReactNode;
   loading?: boolean;
   error?: string | null;
-  children: ReactNode;
+  children?: ReactNode;
 };
 
 export const BentoCard = ({

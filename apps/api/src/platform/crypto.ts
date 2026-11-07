@@ -11,7 +11,8 @@ const KEY_BYTES = 32;
 
 const toBase64 = (bytes: Uint8Array): string => Buffer.from(bytes).toString('base64');
 
-const fromBase64 = (b64: string): Uint8Array => new Uint8Array(Buffer.from(b64, 'base64'));
+const fromBase64 = (b64: string): Uint8Array<ArrayBuffer> =>
+  Uint8Array.from(Buffer.from(b64, 'base64'));
 
 const importAesKey = async (base64Key: string): Promise<CryptoKey> => {
   const raw = fromBase64(base64Key);
