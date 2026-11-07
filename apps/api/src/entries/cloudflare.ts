@@ -9,6 +9,11 @@ export interface CloudflareBindings extends Record<string, unknown> {
 
 export default {
   async fetch(request: Request, env: CloudflareBindings, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+    if (!url.pathname.startsWith('/api/') && env.ASSETS) {
+      return env.ASSETS.fetch(request);
+    }
+
     const deps = createDefaultDeps(env, {
       defer: (promise) => ctx.waitUntil(promise),
     });

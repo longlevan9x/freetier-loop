@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require('node:sqlite') as typeof import('node:sqlite');
@@ -98,7 +99,11 @@ function parseCliArgs(argv: string[]): Record<string, string | boolean> {
   return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}`) {
+const isMainModule =
+  Boolean(process.argv[1]) &&
+  pathToFileURL(resolve(process.argv[1] ?? '')).href === import.meta.url;
+
+if (isMainModule) {
   const args = parseCliArgs(process.argv.slice(2));
   const action = typeof args.action === 'string' ? args.action : 'export';
   const outputPath = resolve(

@@ -1,4 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import crypto from 'node:crypto';
+import { unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { AUTH } from '@freetier-loop/shared';
 import { account, user } from '../src/schema/auth';
 
@@ -51,6 +56,7 @@ const parseCliArgs = (argv: string[]) => {
   let email = '';
   let password = '';
   let name: string | undefined;
+  let remote = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--email' && argv[i + 1]) {
@@ -59,22 +65,60 @@ const parseCliArgs = (argv: string[]) => {
       password = argv[++i] ?? '';
     } else if (arg === '--name' && argv[i + 1]) {
       name = argv[++i];
+    } else if (arg === '--remote') {
+      remote = true;
     }
   }
-  return { email, password, ...(name !== undefined ? { name } : {}) };
+  return { email, password, remote, ...(name !== undefined ? { name } : {}) };
 };
 
-if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}`) {
+const isMainModule =
+  Boolean(process.argv[1]) &&
+  pathToFileURL(resolve(process.argv[1] ?? '')).href === import.meta.url;
+
+if (isMainModule) {
   const args = parseCliArgs(process.argv.slice(2));
   if (!args.email || !args.password) {
     console.error(
-      'Usage: pnpm db:seed:admin --email <email> --password <password> [--name <name>]',
+      'Usage: pnpm db:seed:admin -- --email <email> --password <password> [--name <name>] [--remote]',
     );
     process.exit(1);
   }
   const result = buildSeedAdminSql(args);
-  console.log(`Generated idempotent admin seed SQL for ${result.email} (${result.userId}):`);
-  for (const stmt of result.sqlStatements) {
-    console.log(stmt);
+  const rootDir = resolve(import.meta.dirname, '../../..');
+  const rootConfig = resolve(rootDir, 'wrangler.jsonc');
+  const persistDir = resolve(rootDir, '.wrangler/state');
+  const tempSqlFile = join(tmpdir(), `freetier-seed-admin-${Date.now()}.sql`);
+  writeFileSync(tempSqlFile, `${result.sqlStatements.join('\n')}\n`, 'utf8');
+  const targetFlag = args.remote ? '--remote' : '--local';
+
+  try {
+    execFileSync(
+      'pnpm',
+      [
+        'exec',
+        'wrangler',
+        'd1',
+        'execute',
+        'freetier-loop-db',
+        targetFlag,
+        '--config',
+        rootConfig,
+        ...(args.remote ? [] : ['--persist-to', persistDir]),
+        '--file',
+        tempSqlFile,
+      ],
+      {
+        stdio: 'inherit',
+        shell: process.platform === 'win32',
+      },
+    );
+    console.log(`Seeded admin account: ${result.email} (${result.userId}) [${targetFlag}]`);
+  } finally {
+    try {
+      unlinkSync(tempSqlFile);
+    } catch {
+      // Ignore cleanup errors
+    }
   }
 }

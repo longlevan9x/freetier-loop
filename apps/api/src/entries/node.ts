@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, extname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createApp } from '../app';
 import { createDefaultDeps } from '../platform/deps';
 import {
@@ -63,7 +64,11 @@ const serveStaticOrSpa = (webDistDir: string, pathname: string): Response | null
   return null;
 };
 
-if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}`) {
+const isMainModule =
+  Boolean(process.argv[1]) &&
+  pathToFileURL(resolve(process.argv[1] ?? '')).href === import.meta.url;
+
+if (isMainModule) {
   const port = Number.parseInt(process.env.PORT ?? '8787', 10);
   const webDistDir = resolve(import.meta.dirname, '../../../web/dist');
 

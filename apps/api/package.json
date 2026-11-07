@@ -8,7 +8,7 @@
     "./app": "./src/app.ts"
   },
   "scripts": {
-    "dev": "wrangler dev --config ../../wrangler.jsonc",
+    "dev": "wrangler dev --config ../../wrangler.jsonc --persist-to ../../.wrangler/state",
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
