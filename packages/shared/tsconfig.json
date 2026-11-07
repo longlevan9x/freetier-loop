@@ -1,0 +1,10 @@
+{
+  "extends": "@freetier-loop/config/tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "vitest.config.ts"]
+}

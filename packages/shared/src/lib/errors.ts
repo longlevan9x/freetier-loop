@@ -1,0 +1,51 @@
+﻿import { ERROR_CODE, type ErrorCode } from '../constants/errors';
+import { HTTP_STATUS, type HttpStatus } from '../constants/http';
+
+export type ErrorHttpStatus = Exclude<HttpStatus, typeof HTTP_STATUS.NO_CONTENT>;
+
+export type AppErrorOptions = {
+  status?: ErrorHttpStatus;
+  cause?: unknown;
+  details?: unknown;
+};
+
+const DEFAULT_STATUS_BY_CODE: Record<ErrorCode, ErrorHttpStatus> = {
+  [ERROR_CODE.INTERNAL_ERROR]: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+  [ERROR_CODE.VALIDATION_ERROR]: HTTP_STATUS.BAD_REQUEST,
+  [ERROR_CODE.NOT_FOUND]: HTTP_STATUS.NOT_FOUND,
+  [ERROR_CODE.CONFLICT]: HTTP_STATUS.CONFLICT,
+  [ERROR_CODE.AUTH_UNAUTHORIZED]: HTTP_STATUS.UNAUTHORIZED,
+  [ERROR_CODE.AUTH_NOT_ALLOWED]: HTTP_STATUS.FORBIDDEN,
+  [ERROR_CODE.AUTH_LOCKED]: HTTP_STATUS.LOCKED,
+  [ERROR_CODE.AUTH_CAPTCHA_FAILED]: HTTP_STATUS.BAD_REQUEST,
+  [ERROR_CODE.AUTH_RATE_LIMITED]: HTTP_STATUS.TOO_MANY_REQUESTS,
+  [ERROR_CODE.PROVIDER_AUTH_INVALID]: HTTP_STATUS.BAD_REQUEST,
+  [ERROR_CODE.PROVIDER_PERMISSION_MISSING]: HTTP_STATUS.FORBIDDEN,
+  [ERROR_CODE.PROVIDER_RATE_LIMITED]: HTTP_STATUS.TOO_MANY_REQUESTS,
+  [ERROR_CODE.PROVIDER_UPSTREAM_ERROR]: HTTP_STATUS.BAD_GATEWAY,
+  [ERROR_CODE.PROVIDER_TIMEOUT]: HTTP_STATUS.GATEWAY_TIMEOUT,
+  [ERROR_CODE.PROVIDER_BUDGET_EXCEEDED]: HTTP_STATUS.TOO_MANY_REQUESTS,
+  [ERROR_CODE.PROVIDER_CAPABILITY_UNSUPPORTED]: HTTP_STATUS.BAD_REQUEST,
+  [ERROR_CODE.RESOURCE_SELF_PROTECTED]: HTTP_STATUS.FORBIDDEN,
+  [ERROR_CODE.CONFIRMATION_MISMATCH]: HTTP_STATUS.BAD_REQUEST,
+  [ERROR_CODE.JOB_INVALID_STATE]: HTTP_STATUS.CONFLICT,
+  [ERROR_CODE.JOB_STEP_FAILED]: HTTP_STATUS.UNPROCESSABLE_ENTITY,
+  [ERROR_CODE.JOB_CONCURRENT_MODIFICATION]: HTTP_STATUS.CONFLICT,
+  [ERROR_CODE.CRYPTO_DECRYPT_FAILED]: HTTP_STATUS.INTERNAL_SERVER_ERROR,
+};
+
+export class AppError extends Error {
+  public readonly code: ErrorCode;
+  public readonly status: ErrorHttpStatus;
+  public readonly details?: unknown;
+
+  constructor(code: ErrorCode, message?: string, options?: AppErrorOptions) {
+    super(message ?? code, options?.cause !== undefined ? { cause: options.cause } : undefined);
+    this.name = 'AppError';
+    this.code = code;
+    this.status = options?.status ?? DEFAULT_STATUS_BY_CODE[code];
+    if (options?.details !== undefined) {
+      this.details = options.details;
+    }
+  }
+}

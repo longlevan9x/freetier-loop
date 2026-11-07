@@ -1,0 +1,30 @@
+{
+  "name": "freetier-loop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @freetier-loop/api --filter @freetier-loop/web dev",
+    "build": "pnpm -r build",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:generate": "pnpm --filter @freetier-loop/db db:generate",
+    "db:migrate:local": "wrangler d1 migrations apply freetier-loop-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply freetier-loop-db --remote",
+    "db:seed:admin": "pnpm --filter @freetier-loop/db db:seed:admin"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "wrangler": "^3.99.0"
+  }
+}

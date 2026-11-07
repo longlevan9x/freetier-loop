@@ -1,0 +1,11 @@
+{
+  "extends": "@freetier-loop/config/tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@db/*": ["./src/*"],
+      "@shared/*": ["../shared/src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "drizzle.config.ts", "vitest.config.ts"]
+}

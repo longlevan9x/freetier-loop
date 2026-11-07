@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.vinxi/
+.output/
+*.tsbuildinfo
+
+# Cloudflare / Wrangler
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local SQLite / D1 state
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Test & coverage
+coverage/
+playwright-report/
+test-results/
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+

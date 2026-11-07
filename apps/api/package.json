@@ -1,0 +1,33 @@
+{
+  "name": "@freetier-loop/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/app.ts",
+    "./app": "./src/app.ts"
+  },
+  "scripts": {
+    "dev": "wrangler dev --config ../../wrangler.jsonc",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@freetier-loop/db": "workspace:*",
+    "@freetier-loop/shared": "workspace:*",
+    "@hono/zod-validator": "^0.4.2",
+    "better-auth": "^1.2.5",
+    "drizzle-orm": "^0.38.3",
+    "hono": "^4.6.16",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "@freetier-loop/config": "workspace:*",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "wrangler": "^3.99.0"
+  }
+}

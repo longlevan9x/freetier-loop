@@ -1,0 +1,54 @@
+export const PROVIDER = {
+  CLOUDFLARE: 'cloudflare',
+  VERCEL: 'vercel',
+  SUPABASE: 'supabase',
+} as const;
+
+export type Provider = (typeof PROVIDER)[keyof typeof PROVIDER];
+export const PROVIDER_VALUES = Object.values(PROVIDER) as [Provider, ...Provider[]];
+
+export const PROVIDER_LABEL: Record<Provider, string> = {
+  [PROVIDER.CLOUDFLARE]: 'Cloudflare',
+  [PROVIDER.VERCEL]: 'Vercel',
+  [PROVIDER.SUPABASE]: 'Supabase',
+};
+
+export const ACCOUNT_STATUS = {
+  ACTIVE: 'active',
+  QUOTA_EXCEEDED: 'quota_exceeded',
+  DISABLED: 'disabled',
+  INVALID: 'invalid',
+} as const;
+
+export type AccountStatus = (typeof ACCOUNT_STATUS)[keyof typeof ACCOUNT_STATUS];
+export const ACCOUNT_STATUS_VALUES = Object.values(ACCOUNT_STATUS) as [
+  AccountStatus,
+  ...AccountStatus[],
+];
+
+export const VERCEL_ACCOUNT_TYPE = {
+  HOBBY: 'hobby',
+  TEAM: 'team',
+} as const;
+
+export type VercelAccountType = (typeof VERCEL_ACCOUNT_TYPE)[keyof typeof VERCEL_ACCOUNT_TYPE];
+export const VERCEL_ACCOUNT_TYPE_VALUES = Object.values(VERCEL_ACCOUNT_TYPE) as [
+  VercelAccountType,
+  ...VercelAccountType[],
+];
+
+export const CAPABILITY = {
+  ACCOUNT_VERIFIER: 'account_verifier',
+  ZONES: 'zones',
+  REGISTRAR_DOMAINS: 'registrar_domains',
+  DNS_RECORDS: 'dns_records',
+  PROJECTS: 'projects',
+  PROJECT_DOMAINS: 'project_domains',
+  ENV_VARS: 'env_vars',
+  EDGE_FUNCTIONS: 'edge_functions',
+  SQL_QUERY: 'sql_query',
+  USAGE: 'usage',
+} as const;
+
+export type Capability = (typeof CAPABILITY)[keyof typeof CAPABILITY];
+export const CAPABILITY_VALUES = Object.values(CAPABILITY) as [Capability, ...Capability[]];
