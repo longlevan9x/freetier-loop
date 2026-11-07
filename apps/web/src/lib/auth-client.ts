@@ -2,8 +2,24 @@ import { AUTH_PREFIX, HEADER } from '@freetier-loop/shared';
 import { createAuthClient } from 'better-auth/react';
 import { webEnv } from '../config/env';
 
+const resolveApiOrigin = (): string => {
+  const configured = webEnv.VITE_API_BASE_URL.trim().replace(/\/+$/, '');
+  if (configured.startsWith('http://') || configured.startsWith('https://')) {
+    return configured;
+  }
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  return 'http://localhost:8787';
+};
+
+const resolveApiPrefixUrl = (): string => {
+  const configured = webEnv.VITE_API_BASE_URL.trim().replace(/\/+$/, '');
+  return `${configured}${AUTH_PREFIX}`;
+};
+
 export const betterAuthClient = createAuthClient({
-  baseURL: `${webEnv.VITE_API_BASE_URL || window.location.origin}${AUTH_PREFIX}`,
+  baseURL: `${resolveApiOrigin()}${AUTH_PREFIX}`,
 });
 
 export type AuthSessionUser = {
@@ -17,7 +33,7 @@ export const signInWithTurnstile = async (input: {
   password: string;
   captchaToken: string;
 }): Promise<{ user: AuthSessionUser }> => {
-  const res = await fetch(`${webEnv.VITE_API_BASE_URL}${AUTH_PREFIX}/sign-in/email`, {
+  const res = await fetch(`${resolveApiPrefixUrl()}/sign-in/email`, {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -40,7 +56,7 @@ export const signInWithTurnstile = async (input: {
 };
 
 export const fetchCurrentSession = async (): Promise<AuthSessionUser | null> => {
-  const res = await fetch(`${webEnv.VITE_API_BASE_URL}${AUTH_PREFIX}/get-session`, {
+  const res = await fetch(`${resolveApiPrefixUrl()}/get-session`, {
     method: 'GET',
     credentials: 'include',
   });
@@ -52,7 +68,7 @@ export const fetchCurrentSession = async (): Promise<AuthSessionUser | null> => 
 };
 
 export const signOutSession = async (): Promise<void> => {
-  await fetch(`${webEnv.VITE_API_BASE_URL}${AUTH_PREFIX}/sign-out`, {
+  await fetch(`${resolveApiPrefixUrl()}/sign-out`, {
     method: 'POST',
     credentials: 'include',
   });
