@@ -11,12 +11,13 @@ import {
   AlertTriangle,
   ArrowRightLeft,
   Camera,
+  Cloud,
   Globe,
   RefreshCw,
   Search,
   Shield,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { BentoCard } from '../../../components/bento/BentoCard';
 import { BentoGrid } from '../../../components/bento/BentoGrid';
 import { Button } from '../../../components/ui/button';
@@ -88,6 +89,10 @@ export const DomainsView = () => {
   const children: ResourceDto[] = detailQuery.data?.children ?? [];
   const pageSize = 100;
   const visibleRecords = children.slice(recordPage * pageSize, (recordPage + 1) * pageSize);
+
+  const accountMap = useMemo(() => {
+    return new Map((accountsQuery.data ?? []).map((acc) => [acc.id, acc]));
+  }, [accountsQuery.data]);
 
   const hasCfAccount = (accountsQuery.data ?? []).some((a) => a.provider === PROVIDER.CLOUDFLARE);
   const needsSync = hasCfAccount && zones.length === 0 && !zonesQuery.isPending && !search;
@@ -163,6 +168,7 @@ export const DomainsView = () => {
           ) : (
             <div className="divide-y divide-zinc-800/70">
               {zones.map((zone) => {
+                const acc = accountMap.get(zone.providerAccountId);
                 const isRegistrar = Boolean(zone.data.registrar || zone.data.isCfRegistrar);
                 const isSelected = selectedZoneId === zone.id;
                 return (
@@ -178,9 +184,15 @@ export const DomainsView = () => {
                         setSelectedZoneId(zone.id);
                         setRecordPage(0);
                       }}
-                      className="flex items-center gap-2.5 text-left"
+                      className="flex flex-wrap items-center gap-2.5 text-left cursor-pointer"
                     >
                       <span className="font-semibold text-zinc-100">{zone.name}</span>
+                      {acc ? (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[11px] font-medium text-emerald-300">
+                          <Cloud className="h-3 w-3" />
+                          {acc.label}
+                        </span>
+                      ) : null}
                       {isRegistrar ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
                           <Shield className="h-3 w-3" />
