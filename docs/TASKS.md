@@ -49,7 +49,7 @@
 
 ## M1 — Auth & Security
 
-- [ ] **T-030 Benchmark password hashing trên Workers** (S) — Deps: T-007
+- [x] **T-030 Benchmark password hashing trên Workers** (S) — Deps: T-007
   So sánh scrypt mặc định của better-auth với `node:crypto` scrypt (N=16384,r=16,p=1) về CPU time trên `wrangler dev --remote`/deploy thử.
   AC: chọn tham số < 10 ms CPU (hoặc ghi ADR chuyển sang Workers Paid); implement `platform/password-hasher.ts` + test.
 - [ ] **T-031 Schema auth + better-auth factory** (M) — Deps: T-004, T-030
@@ -73,10 +73,10 @@
 - [ ] **T-037 Login page + Turnstile client** (M) — Deps: T-006, T-035
   `authClient` (better-auth/react), trang `/login` (form RHF + Zod, Turnstile widget, reset sau mỗi lần thử, map lỗi), route guard `beforeLoad`, logout, không có link đăng ký.
   AC: e2e: login thành công → dashboard; sai mật khẩu hiện lỗi; F5 giữ session.
-- [ ] **T-038 Security headers & CSP** (S) — Deps: T-005
+- [x] **T-038 Security headers & CSP** (S) — Deps: T-005
   `secureHeaders` với CSP cho `challenges.cloudflare.com`, HSTS, frame-ancestors none, Referrer-Policy.
   AC: kiểm tra header trong test; Turnstile vẫn render.
-- [ ] **T-039 Crypto service (AES-GCM) + key rotation** (M) — Deps: T-005
+- [x] **T-039 Crypto service (AES-GCM) + key rotation** (M) — Deps: T-005
   `platform/crypto.ts` WebCrypto: `encrypt/decrypt` format `v{n}:{iv}:{ct}`, hỗ trợ `ENCRYPTION_KEY_PREVIOUS`, CLI `pnpm secrets:reencrypt`.
   AC: round-trip test, ciphertext bị sửa → lỗi, rotate thành công.
 
