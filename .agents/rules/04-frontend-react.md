@@ -49,6 +49,13 @@ apps/web/src/
   disabled until a token exists; token is sent as header `x-captcha-response`; widget resets after each attempt.
 - No sign-up page, no "create account" link anywhere.
 
+## UI primitives & styling
+- Headless / custom primitives (`components/ui/*`): Use Radix UI + Tailwind (`clsx` + `tailwind-merge`) shadcn-style components (`Select`, `Dialog`, `DropdownMenu`, `Tabs`, `Tooltip`, etc.).
+- **DO NOT** use unstyled, raw browser-native `<select>` or unstyled controls in the application UI. Keep UI consistent with the dark/light design system.
+- **Cursor pointer & interactive states**:
+  - Global base CSS enforces `cursor: pointer` on `button:not(:disabled)`, `[role="button"]:not([aria-disabled="true"])`, `select`, `a[href]`, `label[for]`, and `summary`, plus `cursor: not-allowed` on disabled states.
+  - Any custom clickable element (e.g. clickable card, list item, custom tab) must have explicit `cursor-pointer` (or `cursor-not-allowed` when disabled) and visible keyboard focus ring (`focus-visible:ring-2`).
+
 ## Code style
 - Function components, named exports, props typed with `type XProps = {...}`.
 - No inline magic strings for routes/status/labels — use shared constants & label maps.

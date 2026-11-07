@@ -35,6 +35,10 @@ free-tier quota. Single-admin, no public sign-up.
    snapshot saved in DB, explicit typed confirmation, audit log entry.
 8. **Free-plan aware:** a single Worker request must stay within **50 external subrequests**
    and ~10 ms CPU. Long operations are split into resumable, idempotent job steps.
+9. **UI consistency & interactive states:** All interactive elements (buttons, links, triggers,
+   clickable cards) must show `cursor: pointer` (`cursor: not-allowed` when disabled) and
+   accessible focus rings. Use headless/custom primitives (`components/ui/*` via Radix/shadcn)
+   instead of unstyled native browser controls.
 
 ## Naming conventions
 | Thing | Convention | Example |
