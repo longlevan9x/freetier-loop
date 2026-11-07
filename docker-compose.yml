@@ -5,20 +5,21 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8787:8787"
+    env_file:
+      - .dev.vars
     environment:
       NODE_ENV: production
       PORT: "8787"
       SQLITE_PATH: /data/freetier-loop.sqlite
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:8787}
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-secret-at-least-32-characters-long-012345}
-      ADMIN_EMAILS: ${ADMIN_EMAILS:-admin@example.com}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=}
-      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-1x0000000000000000000000000000000AA}
-      VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET must be set in environment}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:?ADMIN_EMAILS must be set in environment}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set in environment}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?TURNSTILE_SECRET_KEY must be set in environment}
+      VITE_TURNSTILE_SITE_KEY: ${VITE_TURNSTILE_SITE_KEY:?VITE_TURNSTILE_SITE_KEY must be set in environment}
     volumes:
       - freetier_data:/data
     restart: unless-stopped
 
 volumes:
   freetier_data:
-

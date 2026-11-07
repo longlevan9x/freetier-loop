@@ -1,9 +1,8 @@
-import { TURNSTILE_TEST_KEYS } from '@freetier-loop/shared';
 import { z } from 'zod';
 
 export const webEnvSchema = z.object({
   VITE_API_BASE_URL: z.string().default('/'),
-  VITE_TURNSTILE_SITE_KEY: z.string().min(1).default(TURNSTILE_TEST_KEYS.ALWAYS_PASS_SITE_KEY),
+  VITE_TURNSTILE_SITE_KEY: z.string().default(''),
 });
 
 export type WebEnv = Readonly<z.infer<typeof webEnvSchema>>;

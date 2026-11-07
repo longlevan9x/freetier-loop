@@ -1,4 +1,3 @@
-import { TURNSTILE_TEST_KEYS } from '@freetier-loop/shared';
 import { z } from 'zod';
 
 const commaSeparatedList = z
@@ -13,14 +12,11 @@ const commaSeparatedList = z
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  BETTER_AUTH_SECRET: z
-    .string()
-    .min(32)
-    .default('dev-only-better-auth-secret-please-change-in-prod-32b'),
+  BETTER_AUTH_SECRET: z.string().min(32, 'BETTER_AUTH_SECRET must be set in env (>= 32 chars)'),
   BETTER_AUTH_URL: z.string().url().default('http://localhost:8787'),
   ADMIN_EMAILS: commaSeparatedList,
-  TURNSTILE_SECRET_KEY: z.string().min(1).default(TURNSTILE_TEST_KEYS.ALWAYS_PASS_SECRET_KEY),
-  ENCRYPTION_KEY: z.string().min(32).default('MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY='),
+  TURNSTILE_SECRET_KEY: z.string().min(1, 'TURNSTILE_SECRET_KEY must be set in env'),
+  ENCRYPTION_KEY: z.string().min(32, 'ENCRYPTION_KEY must be set in env (32-byte base64)'),
   ENCRYPTION_KEY_PREVIOUS: z.string().min(32).optional(),
   REQUIRE_2FA: z
     .enum(['true', 'false'])
@@ -34,6 +30,8 @@ export const envSchema = z.object({
 export type AppConfig = Readonly<z.infer<typeof envSchema>>;
 
 export const getConfig = (rawEnv: Record<string, unknown> = {}): AppConfig => {
-  const parsed = envSchema.parse(rawEnv);
+  const merged =
+    typeof process !== 'undefined' && process.env ? { ...process.env, ...rawEnv } : rawEnv;
+  const parsed = envSchema.parse(merged);
   return Object.freeze(parsed);
 };

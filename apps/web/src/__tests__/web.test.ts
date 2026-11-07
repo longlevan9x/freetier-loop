@@ -1,4 +1,4 @@
-import { BENTO_SIZE, ERROR_CODE, TURNSTILE_TEST_KEYS } from '@freetier-loop/shared';
+import { BENTO_SIZE, ERROR_CODE } from '@freetier-loop/shared';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -12,10 +12,10 @@ import { queryKeys } from '../lib/query-keys';
 import { createApiClient } from '../lib/rpc';
 
 describe('@freetier-loop/web Bento UI, Error Mapping & Typed RPC (T-037, T-060..T-065, T-074)', () => {
-  it('parses default web environment with Turnstile test site key', () => {
-    const env = parseWebEnv({});
+  it('parses web environment without hardcoded secret defaults', () => {
+    const env = parseWebEnv({ VITE_TURNSTILE_SITE_KEY: 'site_key_from_env' });
     expect(env.VITE_API_BASE_URL).toBe('/');
-    expect(env.VITE_TURNSTILE_SITE_KEY).toBe(TURNSTILE_TEST_KEYS.ALWAYS_PASS_SITE_KEY);
+    expect(env.VITE_TURNSTILE_SITE_KEY).toBe('site_key_from_env');
   });
 
   it('builds deterministic query keys across all features', () => {

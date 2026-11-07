@@ -1,4 +1,4 @@
-import { AUTH, TURNSTILE_TEST_KEYS, WEB_ROUTES } from '@freetier-loop/shared';
+import { AUTH, WEB_ROUTES } from '@freetier-loop/shared';
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
@@ -25,10 +25,9 @@ export const LoginPage = () => {
   const queryClient = useQueryClient();
   const turnstileRef = useRef<TurnstileInstance | null>(null);
 
-  const isTestKey = webEnv.VITE_TURNSTILE_SITE_KEY === TURNSTILE_TEST_KEYS.ALWAYS_PASS_SITE_KEY;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [captchaToken, setCaptchaToken] = useState<string>(isTestKey ? 'dev-turnstile-pass' : '');
+  const [captchaToken, setCaptchaToken] = useState<string>('');
   const [fieldError, setFieldError] = useState<string | null>(null);
 
   const signInMutation = useMutation({
@@ -50,9 +49,7 @@ export const LoginPage = () => {
     onError: (err) => {
       setFieldError(formatApiError(err, 'Sign-in failed'));
       turnstileRef.current?.reset();
-      if (!isTestKey) {
-        setCaptchaToken('');
-      }
+      setCaptchaToken('');
     },
   });
 
@@ -124,12 +121,18 @@ export const LoginPage = () => {
                 <span>Required</span>
               )}
             </div>
-            <Turnstile
-              ref={turnstileRef}
-              siteKey={webEnv.VITE_TURNSTILE_SITE_KEY}
-              onSuccess={(token) => setCaptchaToken(token)}
-              onExpire={() => setCaptchaToken(isTestKey ? 'dev-turnstile-pass' : '')}
-            />
+            {webEnv.VITE_TURNSTILE_SITE_KEY ? (
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={webEnv.VITE_TURNSTILE_SITE_KEY}
+                onSuccess={(token) => setCaptchaToken(token)}
+                onExpire={() => setCaptchaToken('')}
+              />
+            ) : (
+              <p className="text-xs text-amber-400">
+                Missing VITE_TURNSTILE_SITE_KEY in apps/web/.env
+              </p>
+            )}
           </div>
 
           {fieldError ? (

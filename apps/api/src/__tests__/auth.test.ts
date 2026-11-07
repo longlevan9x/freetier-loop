@@ -5,7 +5,6 @@ import {
   ERROR_CODE,
   HEADER,
   HTTP_STATUS,
-  TURNSTILE_TEST_KEYS,
 } from '@freetier-loop/shared';
 import { describe, expect, it } from 'vitest';
 import { buildSeedAdminSql } from '../../../../packages/db/scripts/seed-admin';
@@ -13,15 +12,20 @@ import { createApp } from '../app';
 import { createDefaultDeps } from '../platform/deps';
 import { createInMemoryDatabase } from '../platform/sqlite-d1';
 
-const createTestHarness = async (opts?: { turnstileSecret?: string }) => {
+const createTestHarness = async (opts?: { failCaptcha?: boolean }) => {
   const { db } = await createInMemoryDatabase();
+  const mockFetch = (async () =>
+    new Response(JSON.stringify({ success: !opts?.failCaptcha }), {
+      status: 200,
+    })) as typeof fetch;
+
   const deps = createDefaultDeps(
     {
       ADMIN_EMAILS: 'admin@example.com',
-      TURNSTILE_SECRET_KEY: opts?.turnstileSecret ?? TURNSTILE_TEST_KEYS.ALWAYS_PASS_SECRET_KEY,
     },
     {
       db,
+      fetchFn: mockFetch,
     },
   );
   await deps.authService.seedAdmin({
@@ -103,7 +107,7 @@ describe('M1 Auth & Security (T-031..T-036)', () => {
 
   it('rejects missing or invalid Turnstile token with 400 AUTH_CAPTCHA_FAILED (T-035)', async () => {
     const { app } = await createTestHarness({
-      turnstileSecret: TURNSTILE_TEST_KEYS.ALWAYS_FAIL_SECRET_KEY,
+      failCaptcha: true,
     });
 
     const missingHeaderRes = await app.request(`${AUTH_PREFIX}/sign-in/email`, {

@@ -1,12 +1,12 @@
-# Local Cloudflare Worker secrets & vars (copy to .dev.vars)
+# Local Cloudflare Worker secrets & vars (copy to .dev.vars and fill in values)
 NODE_ENV=development
 BETTER_AUTH_URL=http://localhost:8787
-BETTER_AUTH_SECRET=dev-only-better-auth-secret-please-change-in-prod-32b
+# Generate with: openssl rand -base64 32
+BETTER_AUTH_SECRET=<REPLACE_WITH_MIN_32_CHAR_SECRET>
 ADMIN_EMAILS=admin@example.com
-# Cloudflare Turnstile always-pass test secret key
-TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA
-# 32-byte base64 key for AES-256-GCM encryption
-ENCRYPTION_KEY=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+# Cloudflare Turnstile secret key (for local dev you can use Cloudflare's official test secret key from Turnstile docs)
+TURNSTILE_SECRET_KEY=<REPLACE_WITH_TURNSTILE_SECRET_KEY>
+# 32-byte base64 key for AES-256-GCM encryption (openssl rand -base64 32)
+ENCRYPTION_KEY=<REPLACE_WITH_32_BYTE_BASE64_ENCRYPTION_KEY>
 REQUIRE_2FA=false
 SELF_PROTECTED_HOSTS=localhost:8787
-

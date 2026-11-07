@@ -6,7 +6,6 @@ import {
   ERROR_CODE,
   HTTP_STATUS,
   ID_PREFIX,
-  TURNSTILE_TEST_KEYS,
   newId,
 } from '@freetier-loop/shared';
 import { and, eq } from 'drizzle-orm';
@@ -123,17 +122,6 @@ export class AuthService {
         ERROR_CODE.AUTH_CAPTCHA_FAILED,
         'Missing Cloudflare Turnstile verification token',
       );
-    }
-
-    if (this.config.TURNSTILE_SECRET_KEY === TURNSTILE_TEST_KEYS.ALWAYS_FAIL_SECRET_KEY) {
-      throw new AppError(ERROR_CODE.AUTH_CAPTCHA_FAILED, 'Turnstile verification failed');
-    }
-
-    if (this.config.TURNSTILE_SECRET_KEY === TURNSTILE_TEST_KEYS.ALWAYS_PASS_SECRET_KEY) {
-      if (token === 'FAIL') {
-        throw new AppError(ERROR_CODE.AUTH_CAPTCHA_FAILED, 'Turnstile verification failed');
-      }
-      return;
     }
 
     const form = new URLSearchParams();
