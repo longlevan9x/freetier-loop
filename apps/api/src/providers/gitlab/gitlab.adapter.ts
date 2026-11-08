@@ -2,6 +2,7 @@ import { AppError, CAPABILITY, type Capability, ERROR_CODE, PROVIDER } from '@fr
 import type {
   AccountVerifier,
   CapabilityMap,
+  GitLabPipeline,
   GitLabProject,
   GitLabVariable,
   GitLabVariableProvider,
@@ -256,5 +257,48 @@ export class GitLabAdapter implements ProviderAdapter, AccountVerifier, GitLabVa
         },
       });
     }
+  }
+
+  async triggerPipeline(
+    ctx: ProviderContext,
+    projectIdOrPath: string | number,
+    ref?: string,
+  ): Promise<GitLabPipeline> {
+    const http = this.client(ctx);
+    let targetRef = ref;
+    if (!targetRef) {
+      try {
+        const project = await http.request<{ default_branch?: string }>({
+          path: GITLAB_ENDPOINTS.PROJECT_DETAIL(projectIdOrPath),
+        });
+        targetRef = project.default_branch || 'main';
+      } catch {
+        targetRef = 'main';
+      }
+    }
+
+    const res = await http.request<{
+      id: number;
+      status: string;
+      ref: string;
+      sha: string;
+      web_url: string;
+      created_at: string;
+    }>({
+      method: 'POST',
+      path: GITLAB_ENDPOINTS.PIPELINES(projectIdOrPath),
+      body: {
+        ref: targetRef,
+      },
+    });
+
+    return {
+      id: res.id,
+      status: res.status,
+      ref: res.ref,
+      sha: res.sha,
+      webUrl: res.web_url,
+      createdAt: res.created_at,
+    };
   }
 }

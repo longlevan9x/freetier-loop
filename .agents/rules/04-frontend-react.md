@@ -60,3 +60,10 @@ apps/web/src/
 - No inline magic strings for routes/status/labels — use shared constants & label maps.
 - Components ≤ ~150 lines; extract hooks for logic. Avoid prop drilling > 2 levels (use composition/context).
 
+## UI microcopy & tone of voice (Admin Console standards)
+- **No redundant meta-labels**: Never prefix card titles, headers, or sections with structural container labels like "Vùng...", "Khu vực...", "Phần...", "Khối...". The visual card/container already defines the boundary. Use clean, direct titles: "Vercel", "Cloudflare", "GitLab", "Supabase".
+- **No prescriptive / patronizing badges**: Do not use subjective labels such as "Khuyên dùng" (Recommended), "Tối ưu nhất", "Nên dùng". Keep copy neutral, professional, and technical. Name badges by their technical scope (e.g. "GitLab + Vercel", "Standard") or omit them if unneeded.
+- **Concise & developer-focused**: Avoid AI boilerplate, filler words, and verbose explanations. Keep UI microcopy short, punchy, and functional (matching Vercel, Stripe, Linear conventions).
+- **Standard technical terms**: Keep standard developer terminology (`Region`, `Repository`, `Project`, `Zone`, `Domain`) instead of awkward literal translations.
+
+

@@ -39,6 +39,7 @@ free-tier quota. Single-admin, no public sign-up.
    clickable cards) must show `cursor: pointer` (`cursor: not-allowed` when disabled) and
    accessible focus rings. Use headless/custom primitives (`components/ui/*` via Radix/shadcn)
    instead of unstyled native browser controls.
+10. **UI microcopy & neutral tone:** No redundant meta-labels ("Vùng...", "Khu vực...", "Phần...") in titles/cards; visual containers define boundaries. No prescriptive AI badges ("Khuyên dùng", "Nên dùng"); keep copy direct, neutral, and developer-focused.
 
 ## Naming conventions
 | Thing | Convention | Example |

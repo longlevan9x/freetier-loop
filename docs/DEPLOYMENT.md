@@ -127,3 +127,23 @@ echo "VITE_TURNSTILE_SITE_KEY=<YOUR_SITE_KEY>" >> apps/web/.env.production
 pnpm deploy
 ```
 
+---
+
+## 8. Hướng dẫn cấp quyền kết nối GitLab (GitLab Token Scopes & Roles)
+
+Khi sử dụng tính năng tự động chuyển giao và cập nhật CI/CD (`gitlab.rewire-vars` và `gitlab.trigger-pipeline`), bạn cần cấp quyền cho GitLab Token như sau:
+
+### Cách 1: Project Access Token (Khuyên dùng nhất & An toàn nhất)
+* **Vị trí tạo:** Mở Repository GitLab cần deploy ➔ **Settings** ➔ **Access Tokens**.
+* **Role (Vai trò):** Chọn tối thiểu **Developer** hoặc **Maintainer** *(Không chọn Guest hoặc Reporter vì sẽ bị lỗi 403 khi ghi biến CI/CD hoặc kích hoạt pipeline)*.
+* **Scopes (Phạm vi):** Tích chọn duy nhất **`api`**.
+* **Đặc điểm:** Token có tiền tố `glpat-...`, được gắn chặt trực tiếp vào repository đó nên hệ thống sẽ tự động nhận diện dự án khi chạy Migration mà không cần cấu hình thêm Project ID.
+
+### Cách 2: Personal Access Token (PAT)
+* **Vị trí tạo:** **User Settings** ➔ **Access Tokens**.
+* **Scopes (Phạm vi):** Tích chọn **`api`**.
+
+### Cấu hình biến CI/CD trên GitLab:
+* Trong **Settings** ➔ **CI/CD** ➔ **Variables**: Nếu branch triển khai của bạn không nằm trong danh sách *Protected Branches*, hãy đảm bảo các biến `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` không bật cờ *Protected* để pipeline có thể đọc được giá trị.
+
+

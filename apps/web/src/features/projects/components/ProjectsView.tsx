@@ -574,7 +574,7 @@ export const ProjectsView = () => {
                               <div className="mt-1 text-[11px] text-zinc-500">
                                 Ref: {proj.externalId}
                                 {!isVercel && proj.data.region
-                                  ? ` · Vùng: ${String(proj.data.region)}`
+                                  ? ` · Region: ${String(proj.data.region)}`
                                   : ''}
                                 {formatGitRepo(proj.data.gitRepo)
                                   ? ` · Repo: ${formatGitRepo(proj.data.gitRepo)}`

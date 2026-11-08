@@ -281,6 +281,16 @@ describe('Providers & HTTP Client (T-041..T-045B)', () => {
           })),
         );
       }
+      if (url.includes('/api/v4/projects/123/pipeline')) {
+        return jsonResponse({
+          id: 888,
+          status: 'pending',
+          ref: 'main',
+          sha: 'abc12345',
+          web_url: 'https://gitlab.com/team/frontend-app/-/pipelines/888',
+          created_at: '2026-11-08T10:00:00Z',
+        });
+      }
       if (url.includes('/api/v4/projects')) {
         return jsonResponse([
           {
@@ -318,5 +328,12 @@ describe('Providers & HTTP Client (T-041..T-045B)', () => {
     // Create new
     await gitlab.upsertVariable(ctx, 123, { key: 'VERCEL_PROJECT_ID', value: 'prj_new_id' });
     expect(variablesStore.VERCEL_PROJECT_ID).toBe('prj_new_id');
+
+    // Trigger pipeline
+    const pipeline = await gitlab.triggerPipeline(ctx, 123, 'main');
+    expect(pipeline.id).toBe(888);
+    expect(pipeline.status).toBe('pending');
+    expect(pipeline.ref).toBe('main');
+    expect(pipeline.webUrl).toContain('/pipelines/888');
   });
 });

@@ -11,6 +11,7 @@ import {
   type JobEventLevel,
   type JobStepDto,
   type ManualStepInput,
+  PROVIDER,
   STEP_STATUS,
   newId,
 } from '@freetier-loop/shared';
@@ -618,6 +619,19 @@ export class JobsService {
       throw new AppError(ERROR_CODE.NOT_FOUND, 'Source or target account not found');
     }
 
+    const inputData = (job.input as Record<string, unknown> | null) ?? {};
+    const gitlabAccountId = inputData.gitlabAccountId as string | undefined;
+    let gitlabAccount = null;
+    if (gitlabAccountId) {
+      gitlabAccount = await this.accountsRepo.getDecryptable(gitlabAccountId);
+    } else {
+      const allAccounts = await this.accountsRepo.list();
+      const firstGitLab = allAccounts.find((a) => a.provider === PROVIDER.GITLAB);
+      if (firstGitLab) {
+        gitlabAccount = await this.accountsRepo.getDecryptable(firstGitLab.id);
+      }
+    }
+
     return {
       job,
       step,
@@ -635,6 +649,15 @@ export class JobsService {
         externalAccountId: targetAccount.externalAccountId,
         ...(this.fetchFn ? { fetchFn: this.fetchFn } : {}),
       },
+      ...(gitlabAccount
+        ? {
+            gitlabCtx: {
+              token: gitlabAccount.decryptedToken,
+              externalAccountId: gitlabAccount.externalAccountId,
+              ...(this.fetchFn ? { fetchFn: this.fetchFn } : {}),
+            },
+          }
+        : {}),
       providerRegistry: this.providerRegistry,
       snapshotsService: this.snapshotsService,
       cipher: this.cipher,

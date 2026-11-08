@@ -50,6 +50,7 @@ export const STEP_TYPE = {
   ENV_REWIRE_VARS: 'env.rewire-vars',
   VERCEL_SYNC_RULES: 'vercel.sync-rules',
   GITLAB_REWIRE_VARS: 'gitlab.rewire-vars',
+  GITLAB_TRIGGER_PIPELINE: 'gitlab.trigger-pipeline',
 } as const;
 
 export type StepType = (typeof STEP_TYPE)[keyof typeof STEP_TYPE];
@@ -63,6 +64,7 @@ export interface StepContext {
   resource: ResourceDto;
   sourceCtx: ProviderContext;
   targetCtx: ProviderContext;
+  gitlabCtx?: ProviderContext;
   providerRegistry: ProviderRegistry;
   snapshotsService: SnapshotsService;
   cipher: SecretCipher;

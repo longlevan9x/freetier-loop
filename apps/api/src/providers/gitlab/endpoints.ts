@@ -8,4 +8,8 @@ export const GITLAB_ENDPOINTS = {
     `/projects/${encodeURIComponent(String(projectId))}/variables`,
   VARIABLE_DETAIL: (projectId: string | number, key: string) =>
     `/projects/${encodeURIComponent(String(projectId))}/variables/${encodeURIComponent(key)}`,
+  PIPELINES: (projectId: string | number) =>
+    `/projects/${encodeURIComponent(String(projectId))}/pipeline`,
+  PIPELINE_DETAIL: (projectId: string | number, pipelineId: string | number) =>
+    `/projects/${encodeURIComponent(String(projectId))}/pipelines/${encodeURIComponent(String(pipelineId))}`,
 } as const;

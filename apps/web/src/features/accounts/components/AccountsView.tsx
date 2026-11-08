@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Cloud,
+  GitBranch,
   KeyRound,
   Plus,
   RefreshCw,
@@ -42,7 +43,7 @@ const TOKEN_SCOPE_GUIDE: Record<Provider, string> = {
   [PROVIDER.SUPABASE]:
     'Create a Personal Access Token (PAT) at supabase.com/dashboard/account/tokens',
   [PROVIDER.GITLAB]:
-    'Create a Personal Access Token (PAT) with "api" scope at gitlab.com/-/user_settings/personal_access_tokens',
+    'Tạo Project Access Token (Role: Maintainer/Developer, Scope: api) trong Settings > Access Tokens của repo',
 };
 
 export const AccountsView = () => {
@@ -266,6 +267,62 @@ export const AccountsView = () => {
               </Button>
             </div>
           </form>
+
+          {provider === PROVIDER.GITLAB && (
+            <div className="mt-4 rounded-xl border border-violet-800/40 bg-violet-950/25 p-3.5 text-xs">
+              <div className="flex items-center gap-2 font-semibold text-violet-300">
+                <GitBranch className="h-4 w-4" />
+                Hướng dẫn cấp quyền GitLab Token (để cập nhật biến CI/CD & Deploy)
+              </div>
+              <div className="mt-2.5 grid grid-cols-1 gap-3 text-zinc-300 md:grid-cols-2">
+                <div className="rounded-lg border border-violet-900/40 bg-zinc-950/60 p-2.5">
+                  <span className="font-semibold text-emerald-400">
+                    Cách 1: Project Access Token
+                  </span>
+                  <p className="mt-1 text-[11px] text-zinc-400">
+                    Gắn trực tiếp vào repository cần deploy. Tự động nhận diện project khi
+                    migration.
+                  </p>
+                  <ul className="mt-1.5 list-disc pl-4 space-y-0.5 text-[11px]">
+                    <li>
+                      Mở repository GitLab &gt; <strong>Settings &gt; Access Tokens</strong>
+                    </li>
+                    <li>
+                      <strong>Role:</strong> Chọn{' '}
+                      <span className="text-amber-300 font-mono font-semibold">Maintainer</span>{' '}
+                      (hoặc Developer)
+                    </li>
+                    <li>
+                      <strong>Scopes:</strong> Tích chọn duy nhất{' '}
+                      <span className="text-emerald-300 font-mono font-semibold">api</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="rounded-lg border border-violet-900/40 bg-zinc-950/60 p-2.5">
+                  <span className="font-semibold text-zinc-300">
+                    Cách 2: Personal Access Token (PAT)
+                  </span>
+                  <p className="mt-1 text-[11px] text-zinc-400">
+                    Áp dụng cho toàn bộ tài khoản GitLab cá nhân của bạn.
+                  </p>
+                  <ul className="mt-1.5 list-disc pl-4 space-y-0.5 text-[11px]">
+                    <li>
+                      Vào <strong>User Settings &gt; Access Tokens</strong>
+                    </li>
+                    <li>
+                      <strong>Scopes:</strong> Tích chọn{' '}
+                      <span className="text-emerald-300 font-mono font-semibold">api</span>
+                    </li>
+                    <li>
+                      Lưu ý: Không dùng token chỉ có scope{' '}
+                      <code className="text-red-300">read_user</code> hay fine-grained thiếu quyền.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
 
           {formError ? (
             <p className="mt-3 rounded-lg border border-red-900/60 bg-red-950/40 p-2.5 text-xs text-red-300">

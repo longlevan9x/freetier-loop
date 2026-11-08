@@ -254,20 +254,14 @@ export interface UsageProvider {
   getUsage(ctx: ProviderContext): Promise<UsageMetricSnapshot[]>;
 }
 
-export interface GitLabVariableProvider {
-  listProjects(ctx: ProviderContext): Promise<GitLabProject[]>;
-  listVariables(ctx: ProviderContext, projectIdOrPath: string | number): Promise<GitLabVariable[]>;
-  upsertVariable(
-    ctx: ProviderContext,
-    projectIdOrPath: string | number,
-    variable: {
-      key: string;
-      value: string;
-      masked?: boolean;
-      protected?: boolean;
-    },
-  ): Promise<void>;
-}
+export type GitLabPipeline = {
+  id: number;
+  status: string;
+  ref: string;
+  sha: string;
+  webUrl: string;
+  createdAt: string;
+};
 
 export interface GitLabVariableProvider {
   listProjects(ctx: ProviderContext): Promise<GitLabProject[]>;
@@ -282,6 +276,11 @@ export interface GitLabVariableProvider {
       protected?: boolean;
     },
   ): Promise<void>;
+  triggerPipeline(
+    ctx: ProviderContext,
+    projectIdOrPath: string | number,
+    ref?: string,
+  ): Promise<GitLabPipeline>;
 }
 
 export type CapabilityMap = {

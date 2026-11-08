@@ -1539,7 +1539,7 @@ const gitlabRewireVarsStep: StepDefinition = {
     let gitlabProjectId = input.gitlabProjectId as string | number | undefined;
     const gitlabToken = input.gitlabToken as string | undefined;
 
-    const token = gitlabToken ?? ctx.sourceCtx.token;
+    const token = gitlabToken ?? ctx.gitlabCtx?.token ?? ctx.sourceCtx.token;
     const gitlabProvider = ctx.providerRegistry.getCapability(
       PROVIDER.GITLAB,
       CAPABILITY.GITLAB_VARIABLES,
@@ -1547,19 +1547,32 @@ const gitlabRewireVarsStep: StepDefinition = {
 
     const gitlabCtx: ProviderContext = {
       token,
+      ...(ctx.gitlabCtx?.externalAccountId
+        ? { externalAccountId: ctx.gitlabCtx.externalAccountId }
+        : {}),
       ...(ctx.targetCtx.budget ? { budget: ctx.targetCtx.budget } : {}),
       ...(ctx.targetCtx.fetchFn ? { fetchFn: ctx.targetCtx.fetchFn } : {}),
     };
 
     // Auto-detect project ID from Project Access Token if not passed manually
     if (!gitlabProjectId) {
-      try {
-        const projects = await gitlabProvider.listProjects(gitlabCtx);
-        if (projects[0]) {
-          gitlabProjectId = projects[0].id;
+      if (
+        ctx.gitlabCtx?.externalAccountId &&
+        ctx.gitlabCtx.externalAccountId !== 'gitlab-scoped' &&
+        ctx.gitlabCtx.externalAccountId !== 'gitlab-token' &&
+        !Number.isNaN(Number(ctx.gitlabCtx.externalAccountId))
+      ) {
+        gitlabProjectId = ctx.gitlabCtx.externalAccountId;
+      }
+      if (!gitlabProjectId) {
+        try {
+          const projects = await gitlabProvider.listProjects(gitlabCtx);
+          if (projects[0]) {
+            gitlabProjectId = projects[0].id;
+          }
+        } catch {
+          // continue
         }
-      } catch {
-        // continue
       }
     }
 
@@ -1656,6 +1669,99 @@ const gitlabRewireVarsStep: StepDefinition = {
   },
 };
 
+const gitlabTriggerPipelineStep: StepDefinition = {
+  type: STEP_TYPE.GITLAB_TRIGGER_PIPELINE,
+  title: 'Trigger GitLab CI/CD Pipeline (Deploy to Target Vercel Account)',
+  destructive: false,
+  async plan(ctx): Promise<StepPlan> {
+    const input = (ctx.job.input as Record<string, unknown> | undefined) ?? {};
+    const ref = (input.gitlabRef as string | undefined) ?? 'default branch';
+    return {
+      type: STEP_TYPE.GITLAB_TRIGGER_PIPELINE,
+      title: this.title,
+      summary: `Trigger a fresh GitLab pipeline on branch/ref "${ref}" to deploy the latest commit to target Vercel account.`,
+      destructive: false,
+    };
+  },
+  async execute(ctx): Promise<StepResult> {
+    const input = (ctx.job.input as Record<string, unknown> | undefined) ?? {};
+    let gitlabProjectId = input.gitlabProjectId as string | number | undefined;
+    const gitlabToken = input.gitlabToken as string | undefined;
+    const ref = input.gitlabRef as string | undefined;
+
+    const token = gitlabToken ?? ctx.gitlabCtx?.token ?? ctx.sourceCtx.token;
+    const gitlabProvider = ctx.providerRegistry.getCapability(
+      PROVIDER.GITLAB,
+      CAPABILITY.GITLAB_VARIABLES,
+    );
+
+    const gitlabCtx: ProviderContext = {
+      token,
+      ...(ctx.gitlabCtx?.externalAccountId
+        ? { externalAccountId: ctx.gitlabCtx.externalAccountId }
+        : {}),
+      ...(ctx.targetCtx.budget ? { budget: ctx.targetCtx.budget } : {}),
+      ...(ctx.targetCtx.fetchFn ? { fetchFn: ctx.targetCtx.fetchFn } : {}),
+    };
+
+    if (!gitlabProjectId) {
+      if (
+        ctx.gitlabCtx?.externalAccountId &&
+        ctx.gitlabCtx.externalAccountId !== 'gitlab-scoped' &&
+        ctx.gitlabCtx.externalAccountId !== 'gitlab-token' &&
+        !Number.isNaN(Number(ctx.gitlabCtx.externalAccountId))
+      ) {
+        gitlabProjectId = ctx.gitlabCtx.externalAccountId;
+      }
+      if (!gitlabProjectId) {
+        try {
+          const projects = await gitlabProvider.listProjects(gitlabCtx);
+          if (projects[0]) {
+            gitlabProjectId = projects[0].id;
+          }
+        } catch {
+          // continue
+        }
+      }
+    }
+
+    if (!gitlabProjectId) {
+      await ctx.log(
+        JOB_EVENT_LEVEL.WARN,
+        'Could not determine GitLab project from token; skipping GitLab pipeline trigger.',
+      );
+      return {
+        status: STEP_STATUS.SKIPPED,
+        result: { reason: 'No gitlabProjectId provided or detected' },
+      };
+    }
+
+    await ctx.log(
+      JOB_EVENT_LEVEL.INFO,
+      `Triggering GitLab CI/CD pipeline on project ${gitlabProjectId}...`,
+    );
+
+    const pipeline = await gitlabProvider.triggerPipeline(gitlabCtx, gitlabProjectId, ref);
+
+    await ctx.log(
+      JOB_EVENT_LEVEL.INFO,
+      `GitLab Pipeline #${pipeline.id} created successfully (ref: ${pipeline.ref}, status: ${pipeline.status}). URL: ${pipeline.webUrl}`,
+    );
+
+    return {
+      status: STEP_STATUS.SUCCEEDED,
+      result: {
+        pipelineId: pipeline.id,
+        ref: pipeline.ref,
+        status: pipeline.status,
+        webUrl: pipeline.webUrl,
+        sha: pipeline.sha,
+        createdAt: pipeline.createdAt,
+      },
+    };
+  },
+};
+
 export const STEP_REGISTRY: Record<StepType, StepDefinition> = {
   [STEP_TYPE.PREFLIGHT_VERIFY_ACCOUNTS]: preflightVerifyAccountsStep,
   [STEP_TYPE.SNAPSHOT_RESOURCE]: snapshotResourceStep,
@@ -1685,4 +1791,5 @@ export const STEP_REGISTRY: Record<StepType, StepDefinition> = {
   [STEP_TYPE.ENV_REWIRE_VARS]: envRewireVarsStep,
   [STEP_TYPE.VERCEL_SYNC_RULES]: vercelSyncRulesStep,
   [STEP_TYPE.GITLAB_REWIRE_VARS]: gitlabRewireVarsStep,
+  [STEP_TYPE.GITLAB_TRIGGER_PIPELINE]: gitlabTriggerPipelineStep,
 };
