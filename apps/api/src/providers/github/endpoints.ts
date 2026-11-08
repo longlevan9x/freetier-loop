@@ -10,4 +10,3 @@ export const GITHUB_ENDPOINTS = {
   DISPATCH_WORKFLOW: (owner: string, repo: string, workflowId: string | number) =>
     `/repos/${owner}/${repo}/actions/workflows/${encodeURIComponent(String(workflowId))}/dispatches`,
 } as const;
-
