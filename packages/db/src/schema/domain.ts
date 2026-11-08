@@ -1,6 +1,7 @@
 import {
   ACCOUNT_STATUS,
   ACCOUNT_STATUS_VALUES,
+  ACCOUNT_TYPE_VALUES,
   ERROR_CODE_VALUES,
   ID_PREFIX,
   JOB_EVENT_LEVEL_VALUES,
@@ -13,7 +14,6 @@ import {
   STEP_STATUS,
   STEP_STATUS_VALUES,
   USAGE_METRIC_VALUES,
-  VERCEL_ACCOUNT_TYPE_VALUES,
 } from '@freetier-loop/shared';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { user } from './auth';
@@ -26,7 +26,7 @@ export const providerAccounts = sqliteTable(
     provider: text('provider', { enum: PROVIDER_VALUES }).notNull(),
     label: text('label').notNull(),
     externalAccountId: text('external_account_id'),
-    accountType: text('account_type', { enum: VERCEL_ACCOUNT_TYPE_VALUES }),
+    accountType: text('account_type', { enum: ACCOUNT_TYPE_VALUES }),
     encryptedToken: text('encrypted_token').notNull(),
     tokenLast4: text('token_last4').notNull(),
     status: text('status', { enum: ACCOUNT_STATUS_VALUES })

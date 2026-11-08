@@ -1,8 +1,8 @@
-﻿import { z } from 'zod';
+import { z } from 'zod';
 import {
   ACCOUNT_STATUS_VALUES,
+  ACCOUNT_TYPE_VALUES,
   PROVIDER_VALUES,
-  VERCEL_ACCOUNT_TYPE_VALUES,
 } from '../constants/providers';
 
 export const quotaConfigSchema = z.object({
@@ -16,6 +16,7 @@ export const createProviderAccountSchema = z.object({
   provider: z.enum(PROVIDER_VALUES),
   label: z.string().trim().min(1).max(80),
   externalAccountId: z.string().trim().min(1).max(120).optional(),
+  accountType: z.enum(ACCOUNT_TYPE_VALUES).optional(),
   apiToken: z.string().trim().min(10).max(512),
   quotaConfig: quotaConfigSchema.optional(),
 });
@@ -24,6 +25,7 @@ export type CreateProviderAccountInput = z.infer<typeof createProviderAccountSch
 
 export const updateProviderAccountSchema = z.object({
   label: z.string().trim().min(1).max(80).optional(),
+  accountType: z.enum(ACCOUNT_TYPE_VALUES).optional(),
   apiToken: z.string().trim().min(10).max(512).optional(),
   status: z.enum(ACCOUNT_STATUS_VALUES).optional(),
   quotaConfig: quotaConfigSchema.optional(),
@@ -36,7 +38,7 @@ export const providerAccountDtoSchema = z.object({
   provider: z.enum(PROVIDER_VALUES),
   label: z.string(),
   externalAccountId: z.string().nullable(),
-  accountType: z.enum(VERCEL_ACCOUNT_TYPE_VALUES).nullable().optional(),
+  accountType: z.enum(ACCOUNT_TYPE_VALUES).nullable().optional(),
   tokenLast4: z.string().length(4),
   status: z.enum(ACCOUNT_STATUS_VALUES),
   scopesVerified: z.array(z.string()),

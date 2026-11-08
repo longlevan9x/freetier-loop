@@ -3,7 +3,6 @@ import {
   BENTO_SIZE,
   PROVIDER,
   PROVIDER_LABEL,
-  PROVIDER_VALUES,
   type Provider,
   type ProviderAccountDto,
   createProviderAccountSchema,
@@ -14,7 +13,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Cloud,
-  GitBranch,
   KeyRound,
   Plus,
   RefreshCw,
@@ -35,20 +33,97 @@ import { formatApiError } from '../../../lib/error-messages';
 import { queryKeys } from '../../../lib/query-keys';
 import { apiClient } from '../../../lib/rpc';
 
-const TOKEN_SCOPE_GUIDE: Record<Provider, string> = {
-  [PROVIDER.CLOUDFLARE]:
-    'Required scopes: Zone:Edit, DNS:Edit, Account Settings:Read, Workers Scripts:Edit, Analytics:Read',
-  [PROVIDER.VERCEL]:
-    'Create a Full-Account Token at vercel.com/account/tokens (supports Hobby & Team accounts)',
-  [PROVIDER.SUPABASE]:
-    'Create a Personal Access Token (PAT) at supabase.com/dashboard/account/tokens',
-  [PROVIDER.GITLAB]:
-    'Tạo Project Access Token (Role: Maintainer/Developer, Scope: api) trong Settings > Access Tokens của repo',
+type AccountKindOption = 'cloudflare' | 'vercel' | 'supabase' | 'gitlab_project' | 'gitlab_user';
+
+interface AccountOptionConfig {
+  value: AccountKindOption;
+  label: string;
+  provider: Provider;
+  accountType?: 'project' | 'user';
+  defaultLabelPlaceholder: string;
+  summary: string;
+  scopeRequirement: string;
+  guideSteps: string[];
+}
+
+const DEFAULT_ACCOUNT_OPTION: AccountOptionConfig = {
+  value: 'cloudflare',
+  label: 'Cloudflare',
+  provider: PROVIDER.CLOUDFLARE,
+  defaultLabelPlaceholder: 'VD: Cloudflare Account 1',
+  summary: 'Quản lý DNS, Domains, và Cloudflare Workers.',
+  scopeRequirement:
+    'Zone:Edit, DNS:Edit, Account Settings:Read, Workers Scripts:Edit, Analytics:Read',
+  guideSteps: [
+    'Cloudflare Dashboard > My Profile > API Tokens',
+    'Create Custom Token với các quyền trên',
+    'Account Resources: Include All accounts',
+  ],
 };
+
+const ACCOUNT_OPTIONS: AccountOptionConfig[] = [
+  DEFAULT_ACCOUNT_OPTION,
+  {
+    value: 'vercel',
+    label: 'Vercel',
+    provider: PROVIDER.VERCEL,
+    defaultLabelPlaceholder: 'VD: Vercel Team hoặc Hobby',
+    summary: 'Quản lý Projects, Deployments, Custom Domains, và Environment Variables.',
+    scopeRequirement: 'Full-Account Token (hỗ trợ cả Hobby & Team accounts)',
+    guideSteps: [
+      'vercel.com/account/tokens',
+      'Tạo token mới với phạm vi Full Account',
+      'Dán token vào form bên dưới',
+    ],
+  },
+  {
+    value: 'supabase',
+    label: 'Supabase',
+    provider: PROVIDER.SUPABASE,
+    defaultLabelPlaceholder: 'VD: Supabase Personal',
+    summary: 'Quản lý Database, Project API keys, và Edge Functions.',
+    scopeRequirement: 'Personal Access Token (PAT)',
+    guideSteps: [
+      'supabase.com/dashboard/account/tokens',
+      'Tạo Personal Access Token mới',
+      'Dán token vào form bên dưới',
+    ],
+  },
+  {
+    value: 'gitlab_project',
+    label: 'GitLab (Project)',
+    provider: PROVIDER.GITLAB,
+    accountType: 'project',
+    defaultLabelPlaceholder: 'VD: GitLab (Repo Frontend)',
+    summary:
+      'Project Access Token gắn trực tiếp với 1 repository. Tự động nhận diện project khi migration, không cần chọn thêm.',
+    scopeRequirement: 'Role: Maintainer (hoặc Developer) · Scope: api',
+    guideSteps: [
+      'Repository GitLab > Settings > Access Tokens',
+      'Role: Maintainer (hoặc Developer)',
+      'Scopes: Tích chọn duy nhất api',
+    ],
+  },
+  {
+    value: 'gitlab_user',
+    label: 'GitLab (User)',
+    provider: PROVIDER.GITLAB,
+    accountType: 'user',
+    defaultLabelPlaceholder: 'VD: GitLab (@username)',
+    summary:
+      'Personal Access Token của tài khoản cá nhân, có quyền quản lý nhiều dự án. Khi migration sẽ hiển thị danh sách để chọn dự án.',
+    scopeRequirement: 'Scope: api (Không dùng token chỉ có read_user)',
+    guideSteps: [
+      'GitLab > User Settings > Access Tokens',
+      'Scopes: Tích chọn api',
+      'Dán token vào form bên dưới',
+    ],
+  },
+];
 
 export const AccountsView = () => {
   const queryClient = useQueryClient();
-  const [provider, setProvider] = useState<Provider>(PROVIDER.CLOUDFLARE);
+  const [accountKind, setAccountKind] = useState<AccountKindOption>('cloudflare');
   const [label, setLabel] = useState('');
   const [apiToken, setApiToken] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
@@ -57,6 +132,9 @@ export const AccountsView = () => {
   const [deleteTarget, setDeleteTarget] = useState<ProviderAccountDto | null>(null);
   const [confirmLabel, setConfirmLabel] = useState('');
   const [syncingAll, setSyncingAll] = useState(false);
+
+  const currentConfig: AccountOptionConfig =
+    ACCOUNT_OPTIONS.find((opt) => opt.value === accountKind) ?? DEFAULT_ACCOUNT_OPTION;
 
   const accountsQuery = useQuery({
     queryKey: queryKeys.providerAccounts.all,
@@ -70,7 +148,12 @@ export const AccountsView = () => {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const parsed = createProviderAccountSchema.safeParse({ provider, label, apiToken });
+      const parsed = createProviderAccountSchema.safeParse({
+        provider: currentConfig.provider,
+        label,
+        apiToken,
+        ...(currentConfig.accountType ? { accountType: currentConfig.accountType } : {}),
+      });
       if (!parsed.success) {
         throw { error: { message: parsed.error.issues[0]?.message ?? 'Invalid input' } };
       }
@@ -99,7 +182,7 @@ export const AccountsView = () => {
   const handleChunkedSync = async (accountId: string) => {
     if (syncingAccounts[accountId]) return;
     setSyncingAccounts((prev) => ({ ...prev, [accountId]: true }));
-    setSyncProgress((prev) => ({ ...prev, [accountId]: 'Đang đồng bộ phần 1…' }));
+    setSyncProgress((prev) => ({ ...prev, [accountId]: 'Đang đồng bộ batch 1…' }));
     let cursor: string | undefined;
     let total = 0;
     let chunkIndex = 1;
@@ -120,7 +203,7 @@ export const AccountsView = () => {
         if (cursor) {
           setSyncProgress((prev) => ({
             ...prev,
-            [accountId]: `Đã quét ${total} mục (lấy phần ${chunkIndex}…)`,
+            [accountId]: `Đã quét ${total} tài nguyên (batch ${chunkIndex}…)`,
           }));
         }
       } while (cursor);
@@ -201,7 +284,7 @@ export const AccountsView = () => {
       <BentoGrid>
         <BentoCard
           title="Connect New Provider Account"
-          subtitle={TOKEN_SCOPE_GUIDE[provider]}
+          subtitle={currentConfig.summary}
           size={BENTO_SIZE.FULL}
           icon={<Plus className="h-4 w-4" />}
         >
@@ -211,14 +294,17 @@ export const AccountsView = () => {
                 Provider
               </label>
               <div className="mt-1">
-                <Select value={provider} onValueChange={(val) => setProvider(val as Provider)}>
+                <Select
+                  value={accountKind}
+                  onValueChange={(val) => setAccountKind(val as AccountKindOption)}
+                >
                   <SelectTrigger id="acc-provider">
-                    <SelectValue placeholder="Select provider" />
+                    <SelectValue placeholder="Chọn nhà cung cấp" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROVIDER_VALUES.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {PROVIDER_LABEL[p]}
+                    {ACCOUNT_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -236,7 +322,7 @@ export const AccountsView = () => {
                 required
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
-                placeholder="e.g. CF Account #2 (Backup)"
+                placeholder={currentConfig.defaultLabelPlaceholder}
                 className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100"
               />
             </div>
@@ -268,61 +354,21 @@ export const AccountsView = () => {
             </div>
           </form>
 
-          {provider === PROVIDER.GITLAB && (
-            <div className="mt-4 rounded-xl border border-violet-800/40 bg-violet-950/25 p-3.5 text-xs">
-              <div className="flex items-center gap-2 font-semibold text-violet-300">
-                <GitBranch className="h-4 w-4" />
-                Hướng dẫn cấp quyền GitLab Token (để cập nhật biến CI/CD & Deploy)
-              </div>
-              <div className="mt-2.5 grid grid-cols-1 gap-3 text-zinc-300 md:grid-cols-2">
-                <div className="rounded-lg border border-violet-900/40 bg-zinc-950/60 p-2.5">
-                  <span className="font-semibold text-emerald-400">
-                    Cách 1: Project Access Token
-                  </span>
-                  <p className="mt-1 text-[11px] text-zinc-400">
-                    Gắn trực tiếp vào repository cần deploy. Tự động nhận diện project khi
-                    migration.
-                  </p>
-                  <ul className="mt-1.5 list-disc pl-4 space-y-0.5 text-[11px]">
-                    <li>
-                      Mở repository GitLab &gt; <strong>Settings &gt; Access Tokens</strong>
-                    </li>
-                    <li>
-                      <strong>Role:</strong> Chọn{' '}
-                      <span className="text-amber-300 font-mono font-semibold">Maintainer</span>{' '}
-                      (hoặc Developer)
-                    </li>
-                    <li>
-                      <strong>Scopes:</strong> Tích chọn duy nhất{' '}
-                      <span className="text-emerald-300 font-mono font-semibold">api</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="rounded-lg border border-violet-900/40 bg-zinc-950/60 p-2.5">
-                  <span className="font-semibold text-zinc-300">
-                    Cách 2: Personal Access Token (PAT)
-                  </span>
-                  <p className="mt-1 text-[11px] text-zinc-400">
-                    Áp dụng cho toàn bộ tài khoản GitLab cá nhân của bạn.
-                  </p>
-                  <ul className="mt-1.5 list-disc pl-4 space-y-0.5 text-[11px]">
-                    <li>
-                      Vào <strong>User Settings &gt; Access Tokens</strong>
-                    </li>
-                    <li>
-                      <strong>Scopes:</strong> Tích chọn{' '}
-                      <span className="text-emerald-300 font-mono font-semibold">api</span>
-                    </li>
-                    <li>
-                      Lưu ý: Không dùng token chỉ có scope{' '}
-                      <code className="text-red-300">read_user</code> hay fine-grained thiếu quyền.
-                    </li>
-                  </ul>
-                </div>
-              </div>
+          <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-950/70 p-3 text-xs text-zinc-300">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-violet-400">{currentConfig.label}:</span>
+              <span className="text-zinc-300">{currentConfig.summary}</span>
             </div>
-          )}
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-400">
+              <div>
+                <span className="text-zinc-500 font-medium">Yêu cầu quyền:</span>{' '}
+                <code className="rounded bg-zinc-900 px-1.5 py-0.5 font-mono text-zinc-300">
+                  {currentConfig.scopeRequirement}
+                </code>
+              </div>
+              <div className="text-zinc-500">Cách lấy: {currentConfig.guideSteps.join(' ➔ ')}</div>
+            </div>
+          </div>
 
           {formError ? (
             <p className="mt-3 rounded-lg border border-red-900/60 bg-red-950/40 p-2.5 text-xs text-red-300">

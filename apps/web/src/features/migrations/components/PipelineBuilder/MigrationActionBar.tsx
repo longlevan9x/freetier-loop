@@ -64,7 +64,7 @@ export const MigrationActionBar = ({
             className="h-8 gap-1.5 text-xs text-emerald-300 cursor-pointer disabled:cursor-not-allowed"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Gợi ý mẫu tối ưu
+            Phân tích mẫu phù hợp
           </Button>
 
           <Button
@@ -89,7 +89,7 @@ export const MigrationActionBar = ({
 
       {recommendationReason ? (
         <div className="mt-3 rounded-xl border border-emerald-900/60 bg-emerald-950/30 p-2.5 text-xs text-emerald-300">
-          <strong>Gợi ý từ hệ thống:</strong> {recommendationReason}
+          <strong>Phân tích chiến lược:</strong> {recommendationReason}
         </div>
       ) : null}
 

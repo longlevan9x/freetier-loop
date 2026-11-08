@@ -1,10 +1,10 @@
 import type {
+  AccountType,
   Capability,
   DnsRecordType,
   Provider,
   SupabaseProjectStatus,
   UsageMetric,
-  VercelAccountType,
   ZoneStatus,
 } from '@freetier-loop/shared';
 import type { SubrequestBudget } from './http-client';
@@ -20,7 +20,7 @@ export type VerifiedAccountInfo = {
   valid: boolean;
   externalAccountId: string;
   labelSuggested?: string | undefined;
-  accountType?: VercelAccountType | undefined;
+  accountType?: AccountType | undefined;
   scopesVerified: string[];
 };
 

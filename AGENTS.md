@@ -39,7 +39,10 @@ free-tier quota. Single-admin, no public sign-up.
    clickable cards) must show `cursor: pointer` (`cursor: not-allowed` when disabled) and
    accessible focus rings. Use headless/custom primitives (`components/ui/*` via Radix/shadcn)
    instead of unstyled native browser controls.
-10. **UI microcopy & neutral tone:** No redundant meta-labels ("Vùng...", "Khu vực...", "Phần...") in titles/cards; visual containers define boundaries. No prescriptive AI badges ("Khuyên dùng", "Nên dùng"); keep copy direct, neutral, and developer-focused.
+10. **UI microcopy & neutral tone (Banned Patterns):**
+    - **No redundant meta-labels:** Never prefix titles, cards, or sections with structural container words (BANNED: "Vùng...", "Khu vực...", "Phần...", "Khối...", "Mục...", "Bảng..."). Containers define their own boundaries. Use direct titles: "Vercel", "Cloudflare", "GitLab", "Supabase".
+    - **No prescriptive / patronizing labels:** BANNED: "Khuyên dùng", "Nên dùng", "Tối ưu nhất", "Recommended". This is a developer console; keep copy neutral, factual, and technical. Label badges by technical scope (e.g. "GitLab + Vercel", "Standard") or omit them.
+    - **No AI fluff:** Eliminate filler words and conversational explanations. Microcopy must be concise, punchy, and direct (Vercel/Stripe/Linear standards).
 
 ## Naming conventions
 | Thing | Convention | Example |

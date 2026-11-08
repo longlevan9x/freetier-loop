@@ -51,6 +51,7 @@ export const MigrationsView = () => {
   const [targetAccountId, setTargetAccountId] = useState('');
   const [resourceId, setResourceId] = useState('');
   const [gitlabAccountId, setGitlabAccountId] = useState('');
+  const [gitlabProjectId, setGitlabProjectId] = useState('');
   const [migrationName, setMigrationName] = useState(
     'Cập nhật Token ➔ Deploy GitLab ➔ Transfer Vercel',
   );
@@ -147,6 +148,14 @@ export const MigrationsView = () => {
     }));
   const activeJob = activeJobQuery.data ?? (jobsQuery.data ?? [])[0] ?? null;
   const gitlabAccounts = accounts.filter((a) => a.provider === 'gitlab');
+  const selectedGitLabAccount = gitlabAccounts.find((a) => a.id === gitlabAccountId);
+  const gitlabProjects = (resourcesQuery.data ?? [])
+    .filter(
+      (r) =>
+        r.kind === 'gitlab_project' &&
+        (!gitlabAccountId || r.providerAccountId === gitlabAccountId),
+    )
+    .map((r) => ({ id: r.id, externalId: r.externalId, name: r.name }));
 
   useEffect(() => {
     if (!gitlabAccountId && gitlabAccounts[0]?.id) {
@@ -209,6 +218,7 @@ export const MigrationsView = () => {
       targetAccountId,
       resourceId,
       ...(gitlabAccountId ? { gitlabAccountId } : {}),
+      ...(gitlabProjectId.trim() ? { gitlabProjectId: gitlabProjectId.trim() } : {}),
       steps: pipelineSteps.map((s) => s.actionId),
       createdAt: Date.now(),
     };
@@ -243,6 +253,7 @@ export const MigrationsView = () => {
     if (item.gitlabAccountId) {
       setGitlabAccountId(item.gitlabAccountId);
     }
+    setGitlabProjectId(item.gitlabProjectId ?? '');
     setPipelineSteps(item.steps.map(createStepItem));
     setMigrationName(item.name);
     setActiveTab('builder');
@@ -279,6 +290,7 @@ export const MigrationsView = () => {
           input: {
             customStepTypes: pipelineSteps.map((s) => s.actionId),
             ...(gitlabAccountId ? { gitlabAccountId } : {}),
+            ...(gitlabProjectId.trim() ? { gitlabProjectId: gitlabProjectId.trim() } : {}),
           },
         },
       });
@@ -385,6 +397,9 @@ export const MigrationsView = () => {
   const hasGitLabStep = pipelineSteps.some(
     (s) => s.actionId === 'gitlab.rewire-vars' || s.actionId === 'gitlab.trigger-pipeline',
   );
+  const isGitLabUserToken = selectedGitLabAccount?.accountType === 'user';
+  const isGitLabInvalid =
+    hasGitLabStep && (!gitlabAccountId || (isGitLabUserToken && !gitlabProjectId.trim()));
 
   return (
     <div className="space-y-6">
@@ -439,6 +454,9 @@ export const MigrationsView = () => {
                 setTargetAccountId={setTargetAccountId}
                 gitlabAccountId={gitlabAccountId}
                 setGitlabAccountId={setGitlabAccountId}
+                gitlabProjectId={gitlabProjectId}
+                setGitlabProjectId={setGitlabProjectId}
+                gitlabProjects={gitlabProjects}
                 steps={pipelineSteps}
               />
 
@@ -455,7 +473,7 @@ export const MigrationsView = () => {
                   !targetAccountId ||
                   pipelineSteps.length === 0 ||
                   createAndPlanMutation.isPending ||
-                  (hasGitLabStep && !gitlabAccountId)
+                  isGitLabInvalid
                 }
                 isCreatingPlan={createAndPlanMutation.isPending}
                 saveSuccessMessage={saveSuccessMessage ?? undefined}

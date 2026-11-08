@@ -50,6 +50,7 @@ export interface SavedMigration {
   targetAccountId: string;
   resourceId: string;
   gitlabAccountId?: string | undefined;
+  gitlabProjectId?: string | undefined;
   steps: string[];
   createdAt: number;
 }

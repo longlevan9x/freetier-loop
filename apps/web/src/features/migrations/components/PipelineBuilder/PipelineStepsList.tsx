@@ -24,11 +24,10 @@ export const PipelineStepsList = ({
         <div>
           <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-300">
             <Layers className="h-3.5 w-3.5 text-emerald-400" />
-            2. Các bước thực hiện tuần tự (Execution Pipeline)
+            Các bước thực thi (Pipeline)
           </h4>
           <p className="mt-0.5 text-xs text-zinc-400">
-            Hệ thống sẽ chạy lần lượt từng bước từ trên xuống dưới. Bạn có thể thêm, xóa, hoặc đảo
-            thứ tự.
+            Thực hiện tuần tự từ trên xuống dưới. Có thể thêm, xóa hoặc đổi thứ tự.
           </p>
         </div>
 

@@ -17,10 +17,10 @@ export const PrebuiltTemplatesList = ({
         <div>
           <h4 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-300">
             <SlidersHorizontal className="h-3.5 w-3.5 text-emerald-400" />
-            1. Chọn Mẫu Quy Trình (Pre-built Template)
+            Mẫu quy trình (Templates)
           </h4>
           <p className="mt-0.5 text-xs text-zinc-400">
-            Chọn mẫu sẵn có để tự động điền các bước khuyến nghị hoặc tự thêm bớt bước bên dưới.
+            Nạp mẫu quy trình hoặc cấu hình tùy biến các bước bên dưới.
           </p>
         </div>
       </div>

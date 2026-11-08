@@ -2,12 +2,12 @@ import { providerAccounts, usageSnapshots } from '@freetier-loop/db';
 import {
   ACCOUNT_STATUS,
   type AccountStatus,
+  type AccountType,
   ID_PREFIX,
   type Provider,
   type ProviderAccountDto,
   type QuotaConfig,
   type UsageMetric,
-  type VercelAccountType,
   newId,
 } from '@freetier-loop/shared';
 import { desc, eq } from 'drizzle-orm';
@@ -78,7 +78,7 @@ export class ProviderAccountsRepository {
     provider: Provider;
     label: string;
     externalAccountId: string | null;
-    accountType?: VercelAccountType | null;
+    accountType?: AccountType | null;
     apiToken: string;
     scopesVerified: string[];
     quotaConfig?: QuotaConfig | null;
@@ -131,7 +131,7 @@ export class ProviderAccountsRepository {
       status?: AccountStatus;
       quotaConfig?: QuotaConfig | null;
       externalAccountId?: string | null;
-      accountType?: VercelAccountType | null;
+      accountType?: AccountType | null;
       scopesVerified?: string[];
       lastVerifiedAt?: number;
       lastSyncedAt?: number;

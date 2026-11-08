@@ -1,5 +1,6 @@
 import {
   ACCOUNT_STATUS,
+  type AccountType,
   AppError,
   CAPABILITY,
   type CreateProviderAccountInput,
@@ -9,7 +10,6 @@ import {
   type ProviderAccountDto,
   RESOURCE_KIND,
   type UpdateProviderAccountInput,
-  type VercelAccountType,
   WORKER_BUDGET,
 } from '@freetier-loop/shared';
 import type { Clock } from '../../platform/deps';
@@ -62,7 +62,7 @@ export class ProviderAccountsService {
       provider: input.provider,
       label: input.label,
       externalAccountId: input.externalAccountId ?? verified.externalAccountId,
-      accountType: verified.accountType ?? null,
+      accountType: input.accountType ?? verified.accountType ?? null,
       apiToken: input.apiToken,
       scopesVerified: verified.scopesVerified,
       quotaConfig: input.quotaConfig ?? null,
@@ -94,7 +94,7 @@ export class ProviderAccountsService {
 
     let verifiedFields: {
       externalAccountId?: string | null;
-      accountType?: VercelAccountType | null;
+      accountType?: AccountType | null;
       scopesVerified?: string[];
       lastVerifiedAt?: number;
     } = {};
@@ -111,7 +111,7 @@ export class ProviderAccountsService {
       }
       verifiedFields = {
         externalAccountId: verified.externalAccountId,
-        accountType: verified.accountType ?? null,
+        accountType: input.accountType ?? verified.accountType ?? null,
         scopesVerified: verified.scopesVerified,
         lastVerifiedAt: nowMs,
       };
@@ -184,7 +184,7 @@ export class ProviderAccountsService {
         {
           status: verified.valid ? ACCOUNT_STATUS.ACTIVE : ACCOUNT_STATUS.INVALID,
           externalAccountId: verified.externalAccountId,
-          accountType: verified.accountType ?? null,
+          accountType: verified.accountType ?? decryptable.accountType ?? null,
           scopesVerified: verified.scopesVerified,
           lastVerifiedAt: nowMs,
         },

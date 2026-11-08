@@ -39,6 +39,29 @@ export const VERCEL_ACCOUNT_TYPE_VALUES = Object.values(VERCEL_ACCOUNT_TYPE) as 
   ...VercelAccountType[],
 ];
 
+export const GITLAB_TOKEN_TYPE = {
+  PROJECT: 'project',
+  USER: 'user',
+} as const;
+
+export type GitLabTokenType = (typeof GITLAB_TOKEN_TYPE)[keyof typeof GITLAB_TOKEN_TYPE];
+export const GITLAB_TOKEN_TYPE_VALUES = Object.values(GITLAB_TOKEN_TYPE) as [
+  GitLabTokenType,
+  ...GitLabTokenType[],
+];
+
+export const ACCOUNT_TYPE = {
+  ...VERCEL_ACCOUNT_TYPE,
+  ...GITLAB_TOKEN_TYPE,
+} as const;
+
+export const ACCOUNT_TYPE_VALUES = [
+  ...VERCEL_ACCOUNT_TYPE_VALUES,
+  ...GITLAB_TOKEN_TYPE_VALUES,
+] as const;
+
+export type AccountType = (typeof ACCOUNT_TYPE_VALUES)[number];
+
 export const CAPABILITY = {
   ACCOUNT_VERIFIER: 'account_verifier',
   ZONES: 'zones',

@@ -1,4 +1,11 @@
-import { AppError, CAPABILITY, type Capability, ERROR_CODE, PROVIDER } from '@freetier-loop/shared';
+import {
+  AppError,
+  CAPABILITY,
+  type Capability,
+  ERROR_CODE,
+  GITLAB_TOKEN_TYPE,
+  PROVIDER,
+} from '@freetier-loop/shared';
 import type {
   AccountVerifier,
   CapabilityMap,
@@ -60,10 +67,50 @@ export class GitLabAdapter implements ProviderAdapter, AccountVerifier, GitLabVa
         };
       }
 
+      // Check if user endpoint is accessible (to determine if it's a real user PAT)
+      let isUser = false;
+      let username = '';
+      try {
+        const u = await http.request<{ username?: string }>({ path: GITLAB_ENDPOINTS.USER });
+        if (u.username && !u.username.startsWith('project_')) {
+          isUser = true;
+          username = u.username;
+        }
+      } catch {
+        isUser = false;
+      }
+
+      if (isUser) {
+        return {
+          valid: true,
+          externalAccountId: String(patRes.user_id ?? patRes.id),
+          labelSuggested: username || patRes.name || 'GitLab',
+          accountType: GITLAB_TOKEN_TYPE.USER,
+          scopesVerified: patRes.scopes ?? ['api'],
+        };
+      }
+
+      // If not a user PAT, it's a Project Access Token
+      let projectId = String(patRes.id);
+      let projectName = patRes.name;
+      try {
+        const projects = await http.request<Array<{ id: number; name: string }>>({
+          path: GITLAB_ENDPOINTS.PROJECTS,
+          query: { membership: true, per_page: 1 },
+        });
+        if (projects[0]) {
+          projectId = String(projects[0].id);
+          projectName = projects[0].name;
+        }
+      } catch {
+        // ignore
+      }
+
       return {
         valid: true,
-        externalAccountId: String(patRes.user_id ?? patRes.id),
-        labelSuggested: patRes.name || undefined,
+        externalAccountId: projectId,
+        labelSuggested: projectName ? `GitLab (${projectName})` : 'GitLab Project Token',
+        accountType: GITLAB_TOKEN_TYPE.PROJECT,
         scopesVerified: patRes.scopes ?? ['api'],
       };
     } catch (patErr) {
@@ -82,10 +129,12 @@ export class GitLabAdapter implements ProviderAdapter, AccountVerifier, GitLabVa
           path: GITLAB_ENDPOINTS.USER,
         });
 
+        const isProjectBot = userRes.username.startsWith('project_');
         return {
           valid: userRes.state !== 'blocked',
           externalAccountId: String(userRes.id),
           labelSuggested: userRes.username || userRes.name || undefined,
+          accountType: isProjectBot ? GITLAB_TOKEN_TYPE.PROJECT : GITLAB_TOKEN_TYPE.USER,
           scopesVerified: ['api'],
         };
       } catch (userErr) {
@@ -104,6 +153,7 @@ export class GitLabAdapter implements ProviderAdapter, AccountVerifier, GitLabVa
             valid: true,
             externalAccountId: projects[0] ? String(projects[0].id) : 'gitlab-token',
             labelSuggested: projects[0]?.name ? `GitLab (${projects[0].name})` : 'GitLab Account',
+            accountType: GITLAB_TOKEN_TYPE.PROJECT,
             scopesVerified: ['api'],
           };
         } catch (projErr) {
@@ -121,6 +171,7 @@ export class GitLabAdapter implements ProviderAdapter, AccountVerifier, GitLabVa
               valid: true,
               externalAccountId: 'gitlab-scoped',
               labelSuggested: 'GitLab Scoped Token',
+              accountType: GITLAB_TOKEN_TYPE.PROJECT,
               scopesVerified: ['ci_variables'],
             };
           }

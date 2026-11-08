@@ -12,6 +12,8 @@ export interface AccountOption {
   id: string;
   label: string;
   provider: string;
+  accountType?: string | null | undefined;
+  externalAccountId?: string | null | undefined;
 }
 
 export interface ResourceOption {
@@ -19,6 +21,12 @@ export interface ResourceOption {
   providerAccountId: string;
   name: string;
   kind: string;
+}
+
+export interface GitLabProjectOption {
+  id: string;
+  externalId: string;
+  name: string;
 }
 
 export interface MigrationAccountsFormProps {
@@ -32,6 +40,9 @@ export interface MigrationAccountsFormProps {
   setTargetAccountId: (id: string) => void;
   gitlabAccountId: string;
   setGitlabAccountId: (id: string) => void;
+  gitlabProjectId?: string | undefined;
+  setGitlabProjectId?: ((id: string) => void) | undefined;
+  gitlabProjects?: GitLabProjectOption[] | undefined;
   steps: PipelineStepItem[];
 }
 
@@ -46,6 +57,9 @@ export const MigrationAccountsForm = ({
   setTargetAccountId,
   gitlabAccountId,
   setGitlabAccountId,
+  gitlabProjectId,
+  setGitlabProjectId,
+  gitlabProjects = [],
   steps,
 }: MigrationAccountsFormProps) => {
   // Determine participating providers based on steps in the pipeline
@@ -63,6 +77,12 @@ export const MigrationAccountsForm = ({
   const cfAccounts = accounts.filter((a) => a.provider === 'cloudflare');
   const supabaseAccounts = accounts.filter((a) => a.provider === 'supabase');
   const gitlabAccounts = accounts.filter((a) => a.provider === 'gitlab');
+
+  // Currently selected GitLab account details
+  const selectedGitLabAccount = gitlabAccounts.find((a) => a.id === gitlabAccountId);
+  const isUserToken = selectedGitLabAccount?.accountType === 'user';
+  const isProjectToken =
+    !selectedGitLabAccount?.accountType || selectedGitLabAccount?.accountType === 'project';
 
   // Filter resources by kind and currently selected source account
   const vercelProjects = resources.filter(
@@ -87,10 +107,10 @@ export const MigrationAccountsForm = ({
     <div className="border-t border-zinc-800/80 pt-5 space-y-4">
       <div>
         <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
-          3. Chọn Tài khoản & Tài nguyên
+          Tài khoản & Tài nguyên
         </h4>
         <p className="mt-0.5 text-xs text-zinc-400">
-          Chọn tài khoản và tài nguyên tương ứng cho từng dịch vụ tham gia trong quy trình.
+          Tài khoản và tài nguyên tương ứng theo từng dịch vụ tham gia trong quy trình.
         </p>
       </div>
 
@@ -489,7 +509,7 @@ export const MigrationAccountsForm = ({
                   GitLab (CI/CD Variables & Pipeline Trigger)
                 </h5>
                 <span className="text-[11px] text-zinc-400">
-                  Tài khoản GitLab Project Access Token
+                  Tài khoản GitLab Project hoặc Personal Access Token
                 </span>
               </div>
             </div>
@@ -503,8 +523,7 @@ export const MigrationAccountsForm = ({
             <code className="font-mono text-violet-300">VERCEL_TOKEN</code>,{' '}
             <code className="font-mono text-violet-300">VERCEL_ORG_ID</code>, và{' '}
             <code className="font-mono text-violet-300">VERCEL_PROJECT_ID</code> trên dự án GitLab
-            tương ứng với token đã chọn, sau đó kích hoạt pipeline deploy sang tài khoản Vercel
-            đích.
+            chỉ định, sau đó kích hoạt pipeline deploy sang tài khoản Vercel đích.
           </p>
 
           {gitlabAccounts.length === 0 ? (
@@ -512,41 +531,99 @@ export const MigrationAccountsForm = ({
               <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
               <span>
                 Chưa có tài khoản GitLab nào được kết nối. Hãy vào mục <strong>Tài khoản</strong> để
-                thêm GitLab Project Access Token trước khi thực hiện bước này.
+                thêm GitLab Token trước khi thực hiện bước này.
               </span>
             </div>
           ) : (
-            <div className="mt-3 max-w-md">
-              <label
-                htmlFor="mig-gitlab-account"
-                className="block text-xs font-medium text-zinc-300"
-              >
-                Chọn Dự án / Tài khoản GitLab sử dụng:
-              </label>
-              <div className="mt-1">
-                <Select value={gitlabAccountId} onValueChange={setGitlabAccountId}>
-                  <SelectTrigger id="mig-gitlab-account">
-                    <SelectValue placeholder="Chọn tài khoản/dự án GitLab..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {gitlabAccounts.map((acc) => (
-                      <SelectItem key={acc.id} value={acc.id}>
-                        {acc.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="mt-3.5 space-y-3">
+              {/* Account Selector with Token Type Badges */}
+              <div className="max-w-md">
+                <label
+                  htmlFor="mig-gitlab-account"
+                  className="block text-xs font-medium text-zinc-300"
+                >
+                  Chọn Tài khoản GitLab:
+                </label>
+                <div className="mt-1">
+                  <Select value={gitlabAccountId} onValueChange={setGitlabAccountId}>
+                    <SelectTrigger id="mig-gitlab-account">
+                      <SelectValue placeholder="Chọn tài khoản GitLab..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {gitlabAccounts.map((acc) => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          {acc.label} ({acc.accountType === 'user' ? 'User Token' : 'Project Token'}
+                          )
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <p className="mt-1 text-[11px] text-zinc-400">
-                * Mỗi tài khoản GitLab là một Project Access Token. Hệ thống sẽ tự động xác định
-                Project ID từ token này.
-              </p>
+
+              {/* Intelligent Adaption based on Token Type */}
+              {isProjectToken ? (
+                <div className="rounded-lg border border-emerald-900/40 bg-emerald-950/20 p-2.5 text-xs text-zinc-300">
+                  <div className="flex items-center gap-2 font-medium text-emerald-400">
+                    <span>Dự án gắn liền theo Project Token</span>
+                    {selectedGitLabAccount?.externalAccountId &&
+                    selectedGitLabAccount.externalAccountId !== 'gitlab-token' ? (
+                      <span className="font-mono text-[11px] text-zinc-300">
+                        (ID: {selectedGitLabAccount.externalAccountId})
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-[11px] text-zinc-400">
+                    Token này được tạo trực tiếp từ Repository GitLab. Hệ thống sẽ tự động cập nhật
+                    và kích hoạt deploy cho đúng dự án này.
+                  </p>
+                </div>
+              ) : isUserToken ? (
+                <div className="max-w-md space-y-1.5 rounded-lg border border-violet-900/40 bg-zinc-950/60 p-3">
+                  <label
+                    htmlFor="mig-gitlab-project"
+                    className="block text-xs font-medium text-zinc-300"
+                  >
+                    Dự án GitLab cần deploy (Project ID hoặc Path):
+                  </label>
+                  {gitlabProjects.length > 0 && setGitlabProjectId ? (
+                    <Select
+                      value={gitlabProjectId}
+                      onValueChange={(val) => setGitlabProjectId(val)}
+                    >
+                      <SelectTrigger id="mig-gitlab-project" className="h-8 text-xs">
+                        <SelectValue placeholder="Chọn từ dự án đã đồng bộ..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {gitlabProjects.map((p) => (
+                          <SelectItem key={p.id} value={p.externalId}>
+                            {p.name} (ID: {p.externalId})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                  {setGitlabProjectId ? (
+                    <input
+                      type="text"
+                      value={gitlabProjectId ?? ''}
+                      onChange={(e) => setGitlabProjectId(e.target.value)}
+                      placeholder="VD: 12345678 hoặc group/my-repo"
+                      className="h-8 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1 text-xs text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    />
+                  ) : null}
+                  <p className="text-[10px] text-zinc-400">
+                    * Tài khoản User quản lý nhiều dự án. Vui lòng chọn hoặc nhập dự án cần thao
+                    tác.
+                  </p>
+                </div>
+              ) : null}
             </div>
           )}
 
           <div className="mt-3 rounded-lg border border-violet-900/50 bg-zinc-950/60 p-2.5 text-[11px] text-zinc-300 space-y-1">
             <div className="font-semibold text-amber-300">
-              Yêu cầu quyền hạn tối thiểu của GitLab Project Token:
+              Yêu cầu quyền hạn tối thiểu của GitLab Token:
             </div>
             <ul className="list-disc pl-4 space-y-0.5 text-zinc-400">
               <li>
