@@ -47,6 +47,7 @@ export const MIGRATION_TEMPLATE = {
   DNS_REPOINT: 'DNS_REPOINT',
   ENV_REWIRE: 'ENV_REWIRE',
   VERCEL_GITLAB_CUTOVER: 'VERCEL_GITLAB_CUTOVER',
+  VERCEL_GITHUB_CUTOVER: 'VERCEL_GITHUB_CUTOVER',
 } as const;
 
 export type MigrationTemplate = (typeof MIGRATION_TEMPLATE)[keyof typeof MIGRATION_TEMPLATE];
@@ -67,4 +68,5 @@ export const MIGRATION_TEMPLATE_LABEL: Record<MigrationTemplate, string> = {
   [MIGRATION_TEMPLATE.DNS_REPOINT]: 'Repoint DNS Records',
   [MIGRATION_TEMPLATE.ENV_REWIRE]: 'Rewire Environment Variables',
   [MIGRATION_TEMPLATE.VERCEL_GITLAB_CUTOVER]: 'Vercel + GitLab Full Cutover (Domain, Rules, CI/CD)',
+  [MIGRATION_TEMPLATE.VERCEL_GITHUB_CUTOVER]: 'Vercel + GitHub Full Cutover (Domain, Rules, CI/CD)',
 };

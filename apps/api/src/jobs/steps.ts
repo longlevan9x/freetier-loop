@@ -8,6 +8,7 @@ import {
   VERCEL_ACCOUNT_TYPE,
 } from '@freetier-loop/shared';
 import type {
+  GitHubVariable,
   GitLabVariable,
   NormalizedDnsRecord,
   NormalizedEnvVar,
@@ -1762,6 +1763,246 @@ const gitlabTriggerPipelineStep: StepDefinition = {
   },
 };
 
+const githubRewireVarsStep: StepDefinition = {
+  type: STEP_TYPE.GITHUB_REWIRE_VARS,
+  title: 'Update GitHub Actions Variables (Token, Team ID, Project ID)',
+  destructive: false,
+  async plan(ctx): Promise<StepPlan> {
+    const input = (ctx.job.input as Record<string, unknown> | undefined) ?? {};
+    const githubRepo = (input.githubRepo as string | undefined) ?? 'configured repo';
+    return {
+      type: STEP_TYPE.GITHUB_REWIRE_VARS,
+      title: this.title,
+      summary: `Update VERCEL_TOKEN, VERCEL_ORG_ID/TEAM_ID, and VERCEL_PROJECT_ID on GitHub repo ${githubRepo}.`,
+      destructive: false,
+    };
+  },
+  async execute(ctx): Promise<StepResult> {
+    const input = (ctx.job.input as Record<string, unknown> | undefined) ?? {};
+    let githubRepo = input.githubRepo as string | undefined;
+    const githubToken = input.githubToken as string | undefined;
+
+    const token = githubToken ?? ctx.githubCtx?.token ?? ctx.sourceCtx.token;
+    const githubProvider = ctx.providerRegistry.getCapability(
+      PROVIDER.GITHUB,
+      CAPABILITY.GITHUB_VARIABLES,
+    );
+
+    const githubCtx: ProviderContext = {
+      token,
+      ...(ctx.githubCtx?.externalAccountId
+        ? { externalAccountId: ctx.githubCtx.externalAccountId }
+        : {}),
+      ...(ctx.targetCtx.budget ? { budget: ctx.targetCtx.budget } : {}),
+      ...(ctx.targetCtx.fetchFn ? { fetchFn: ctx.targetCtx.fetchFn } : {}),
+    };
+
+    if (!githubRepo) {
+      const link = (ctx.resource.data as Record<string, unknown> | undefined)?.link as
+        | Record<string, unknown>
+        | undefined;
+      if (link?.type === 'github' && typeof link.repo === 'string' && link.repo) {
+        githubRepo = link.repo;
+      } else if (ctx.githubCtx?.externalAccountId?.includes('/')) {
+        githubRepo = ctx.githubCtx.externalAccountId;
+      }
+      if (!githubRepo) {
+        try {
+          const repos = await githubProvider.listRepos(githubCtx);
+          if (repos[0]) {
+            githubRepo = repos[0].fullName;
+          }
+        } catch {
+          // continue
+        }
+      }
+    }
+
+    if (!githubRepo) {
+      await ctx.log(
+        JOB_EVENT_LEVEL.WARN,
+        'Could not determine GitHub repo from context; skipping GitHub Actions rewire.',
+      );
+      return {
+        status: STEP_STATUS.SKIPPED,
+        result: { reason: 'No githubRepo provided or detected' },
+      };
+    }
+
+    let existingVars: GitHubVariable[] = [];
+    try {
+      existingVars = await githubProvider.listVariables(githubCtx, githubRepo);
+    } catch (err) {
+      await ctx.log(
+        JOB_EVENT_LEVEL.WARN,
+        `Could not read GitHub variables directly: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    const previousValues: Record<string, string> = {};
+    for (const v of existingVars) {
+      previousValues[v.name] = v.value;
+    }
+
+    const targetToken = ctx.targetCtx.token;
+    const targetOrgId =
+      ctx.targetCtx.externalAccountId ?? ctx.targetAccount.externalAccountId ?? '';
+    const createResult = getPriorStepResult(ctx, STEP_TYPE.VERCEL_CREATE_PROJECT);
+    const targetProjectId =
+      (createResult?.targetProjectId as string | undefined) ?? ctx.resource.externalId;
+
+    const updates: Array<{ name: string; value: string }> = [
+      { name: 'VERCEL_TOKEN', value: targetToken },
+    ];
+
+    if (existingVars.some((v) => v.name === 'VERCEL_TEAM_ID')) {
+      updates.push({ name: 'VERCEL_TEAM_ID', value: targetOrgId });
+    } else {
+      updates.push({ name: 'VERCEL_ORG_ID', value: targetOrgId });
+    }
+
+    updates.push({ name: 'VERCEL_PROJECT_ID', value: targetProjectId });
+
+    const updatedKeys: string[] = [];
+    for (const item of updates) {
+      await githubProvider.upsertVariable(githubCtx, githubRepo, item);
+      updatedKeys.push(item.name);
+    }
+
+    await ctx.log(
+      JOB_EVENT_LEVEL.INFO,
+      `Successfully rewired ${updatedKeys.length} GitHub Actions variable(s) on repo ${githubRepo}: ${updatedKeys.join(', ')}.`,
+    );
+
+    return {
+      status: STEP_STATUS.SUCCEEDED,
+      result: {
+        githubRepo,
+        updatedKeys,
+        previousValues,
+      },
+    };
+  },
+  async compensate(ctx): Promise<void> {
+    const res = ctx.step.result ?? {};
+    const githubRepo = res.githubRepo as string | undefined;
+    const previousValues = (res.previousValues as Record<string, string> | undefined) ?? {};
+    if (!githubRepo || Object.keys(previousValues).length === 0) return;
+
+    const input = (ctx.job.input as Record<string, unknown> | undefined) ?? {};
+    const token = (input.githubToken as string | undefined) ?? ctx.sourceCtx.token;
+    const githubProvider = ctx.providerRegistry.getCapability(
+      PROVIDER.GITHUB,
+      CAPABILITY.GITHUB_VARIABLES,
+    );
+    const githubCtx: ProviderContext = {
+      token,
+      budget: ctx.targetCtx.budget,
+      fetchFn: ctx.targetCtx.fetchFn,
+    };
+
+    for (const [name, value] of Object.entries(previousValues)) {
+      await githubProvider.upsertVariable(githubCtx, githubRepo, { name, value });
+    }
+    await ctx.log(
+      JOB_EVENT_LEVEL.WARN,
+      `Compensated: restored ${Object.keys(previousValues).length} GitHub variable(s) to previous values.`,
+    );
+  },
+};
+
+const githubTriggerWorkflowStep: StepDefinition = {
+  type: STEP_TYPE.GITHUB_TRIGGER_WORKFLOW,
+  title: 'Trigger GitHub Actions Workflow (Deploy to Target Vercel Account)',
+  destructive: false,
+  async plan(ctx): Promise<StepPlan> {
+    const input = (ctx.job.input as Record<string, unknown> | undefined) ?? {};
+    const ref = (input.githubRef as string | undefined) ?? 'main';
+    const workflowId = (input.githubWorkflowId as string | undefined) ?? 'deploy.yml';
+    return {
+      type: STEP_TYPE.GITHUB_TRIGGER_WORKFLOW,
+      title: this.title,
+      summary: `Trigger GitHub workflow "${workflowId}" on branch "${ref}" to deploy the latest commit to target Vercel account.`,
+      destructive: false,
+    };
+  },
+  async execute(ctx): Promise<StepResult> {
+    const input = (ctx.job.input as Record<string, unknown> | undefined) ?? {};
+    let githubRepo = input.githubRepo as string | undefined;
+    const githubToken = input.githubToken as string | undefined;
+    const workflowId = (input.githubWorkflowId as string | undefined) ?? 'deploy.yml';
+    const ref = (input.githubRef as string | undefined) ?? 'main';
+
+    const token = githubToken ?? ctx.githubCtx?.token ?? ctx.sourceCtx.token;
+    const githubProvider = ctx.providerRegistry.getCapability(
+      PROVIDER.GITHUB,
+      CAPABILITY.GITHUB_VARIABLES,
+    );
+
+    const githubCtx: ProviderContext = {
+      token,
+      ...(ctx.githubCtx?.externalAccountId
+        ? { externalAccountId: ctx.githubCtx.externalAccountId }
+        : {}),
+      ...(ctx.targetCtx.budget ? { budget: ctx.targetCtx.budget } : {}),
+      ...(ctx.targetCtx.fetchFn ? { fetchFn: ctx.targetCtx.fetchFn } : {}),
+    };
+
+    if (!githubRepo) {
+      const link = (ctx.resource.data as Record<string, unknown> | undefined)?.link as
+        | Record<string, unknown>
+        | undefined;
+      if (link?.type === 'github' && typeof link.repo === 'string' && link.repo) {
+        githubRepo = link.repo;
+      } else if (ctx.githubCtx?.externalAccountId?.includes('/')) {
+        githubRepo = ctx.githubCtx.externalAccountId;
+      }
+      if (!githubRepo) {
+        try {
+          const repos = await githubProvider.listRepos(githubCtx);
+          if (repos[0]) {
+            githubRepo = repos[0].fullName;
+          }
+        } catch {
+          // continue
+        }
+      }
+    }
+
+    if (!githubRepo) {
+      await ctx.log(
+        JOB_EVENT_LEVEL.WARN,
+        'Could not determine GitHub repo from context; skipping GitHub workflow trigger.',
+      );
+      return {
+        status: STEP_STATUS.SKIPPED,
+        result: { reason: 'No githubRepo provided or detected' },
+      };
+    }
+
+    await ctx.log(
+      JOB_EVENT_LEVEL.INFO,
+      `Triggering GitHub Actions workflow "${workflowId}" on repo ${githubRepo} (ref: ${ref})...`,
+    );
+
+    await githubProvider.triggerWorkflow(githubCtx, githubRepo, workflowId, ref);
+
+    await ctx.log(
+      JOB_EVENT_LEVEL.INFO,
+      `GitHub Actions workflow "${workflowId}" dispatched successfully for repo ${githubRepo} on branch ${ref}.`,
+    );
+
+    return {
+      status: STEP_STATUS.SUCCEEDED,
+      result: {
+        githubRepo,
+        workflowId,
+        ref,
+      },
+    };
+  },
+};
+
 export const STEP_REGISTRY: Record<StepType, StepDefinition> = {
   [STEP_TYPE.PREFLIGHT_VERIFY_ACCOUNTS]: preflightVerifyAccountsStep,
   [STEP_TYPE.SNAPSHOT_RESOURCE]: snapshotResourceStep,
@@ -1792,4 +2033,6 @@ export const STEP_REGISTRY: Record<StepType, StepDefinition> = {
   [STEP_TYPE.VERCEL_SYNC_RULES]: vercelSyncRulesStep,
   [STEP_TYPE.GITLAB_REWIRE_VARS]: gitlabRewireVarsStep,
   [STEP_TYPE.GITLAB_TRIGGER_PIPELINE]: gitlabTriggerPipelineStep,
+  [STEP_TYPE.GITHUB_REWIRE_VARS]: githubRewireVarsStep,
+  [STEP_TYPE.GITHUB_TRIGGER_WORKFLOW]: githubTriggerWorkflowStep,
 };

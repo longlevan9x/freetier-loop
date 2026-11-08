@@ -15,7 +15,7 @@ import {
 export interface ModularAction {
   id: string;
   name: string;
-  category: 'vercel' | 'cloudflare' | 'gitlab' | 'supabase';
+  category: 'vercel' | 'cloudflare' | 'gitlab' | 'supabase' | 'github';
   badge: string;
   description: string;
   icon: typeof Cloud;
@@ -51,8 +51,12 @@ export interface SavedMigration {
   resourceId: string;
   gitlabAccountId?: string | undefined;
   gitlabProjectId?: string | undefined;
+  githubAccountId?: string | undefined;
+  githubRepo?: string | undefined;
   steps: string[];
+  lastJobId?: string | undefined;
   createdAt: number;
+  updatedAt?: number | undefined;
 }
 
 export const MODULAR_ACTIONS: ModularAction[] = [
@@ -154,9 +158,40 @@ export const MODULAR_ACTIONS: ModularAction[] = [
     description: 'Cập nhật các chuỗi kết nối Database / API keys sang frontend apps.',
     icon: Database,
   },
+  {
+    id: 'github.rewire-vars',
+    name: 'Cập nhật biến GitHub Actions',
+    category: 'github',
+    badge: 'GitHub CI',
+    description: 'Cập nhật biến môi trường / Secrets trên GitHub Actions của repository.',
+    icon: GitBranch,
+  },
+  {
+    id: 'github.trigger-workflow',
+    name: 'Kích hoạt GitHub Actions Workflow',
+    category: 'github',
+    badge: 'GitHub CI',
+    description: 'Trigger workflow dispatch để build và deploy mã nguồn lên môi trường mới.',
+    icon: Play,
+  },
 ];
 
 export const PREBUILT_TEMPLATES: PrebuiltTemplate[] = [
+  {
+    id: MIGRATION_TEMPLATE.VERCEL_GITHUB_CUTOVER,
+    name: 'Cập nhật Token ➔ Deploy GitHub ➔ Transfer Vercel',
+    category: 'vercel',
+    badge: 'GitHub + Vercel',
+    description:
+      'Cập nhật Vercel Token trên GitHub Actions, kích hoạt workflow deploy code lên Vercel mới, sau đó chuyển custom domain.',
+    defaultSteps: [
+      'github.rewire-vars',
+      'github.trigger-workflow',
+      'vercel.sync-rules',
+      'vercel.move-domains',
+    ],
+    icon: GitBranch,
+  },
   {
     id: MIGRATION_TEMPLATE.VERCEL_GITLAB_CUTOVER,
     name: 'Cập nhật Token ➔ Deploy GitLab ➔ Transfer Vercel',

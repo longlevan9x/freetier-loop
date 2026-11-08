@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   Database,
   ExternalLink,
+  GitBranch,
   Globe,
   KeyRound,
   Pause,
@@ -571,14 +572,49 @@ export const ProjectsView = () => {
                                 ))}
                               </div>
 
-                              <div className="mt-1 text-[11px] text-zinc-500">
-                                Ref: {proj.externalId}
-                                {!isVercel && proj.data.region
-                                  ? ` · Region: ${String(proj.data.region)}`
-                                  : ''}
-                                {formatGitRepo(proj.data.gitRepo)
-                                  ? ` · Repo: ${formatGitRepo(proj.data.gitRepo)}`
-                                  : ''}
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+                                <span>Ref: {proj.externalId}</span>
+                                {!isVercel && proj.data.region ? (
+                                  <span>· Region: {String(proj.data.region)}</span>
+                                ) : null}
+                                {isVercel ? (
+                                  (() => {
+                                    const git = proj.data.gitRepo as
+                                      | { type?: string; repo?: string }
+                                      | undefined;
+                                    if (!git || !git.type) {
+                                      return (
+                                        <span className="inline-flex items-center gap-1 rounded bg-zinc-900 border border-zinc-800 px-1.5 py-0.2 text-[10px] text-zinc-500">
+                                          Không kết nối Git
+                                        </span>
+                                      );
+                                    }
+                                    if (git.type.toLowerCase() === 'gitlab') {
+                                      return (
+                                        <span className="inline-flex items-center gap-1 rounded bg-orange-950/50 border border-orange-800/60 px-1.5 py-0.2 text-[10px] font-mono text-orange-300">
+                                          <GitBranch className="h-2.5 w-2.5 text-orange-400" />
+                                          GitLab: {git.repo}
+                                        </span>
+                                      );
+                                    }
+                                    if (git.type.toLowerCase() === 'github') {
+                                      return (
+                                        <span className="inline-flex items-center gap-1 rounded bg-zinc-800 border border-zinc-700 px-1.5 py-0.2 text-[10px] font-mono text-zinc-300">
+                                          <GitBranch className="h-2.5 w-2.5 text-zinc-400" />
+                                          GitHub: {git.repo}
+                                        </span>
+                                      );
+                                    }
+                                    return (
+                                      <span className="inline-flex items-center gap-1 rounded bg-zinc-800 border border-zinc-700 px-1.5 py-0.2 text-[10px] font-mono text-zinc-300">
+                                        <GitBranch className="h-2.5 w-2.5 text-zinc-400" />
+                                        {git.type}: {git.repo}
+                                      </span>
+                                    );
+                                  })()
+                                ) : formatGitRepo(proj.data.gitRepo) ? (
+                                  <span>· Repo: {formatGitRepo(proj.data.gitRepo)}</span>
+                                ) : null}
                               </div>
                             </button>
 

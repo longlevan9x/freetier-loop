@@ -33,7 +33,13 @@ import { formatApiError } from '../../../lib/error-messages';
 import { queryKeys } from '../../../lib/query-keys';
 import { apiClient } from '../../../lib/rpc';
 
-type AccountKindOption = 'cloudflare' | 'vercel' | 'supabase' | 'gitlab_project' | 'gitlab_user';
+type AccountKindOption =
+  | 'cloudflare'
+  | 'vercel'
+  | 'supabase'
+  | 'gitlab_project'
+  | 'gitlab_user'
+  | 'github';
 
 interface AccountOptionConfig {
   value: AccountKindOption;
@@ -116,6 +122,19 @@ const ACCOUNT_OPTIONS: AccountOptionConfig[] = [
     guideSteps: [
       'GitLab > User Settings > Access Tokens',
       'Scopes: Tích chọn api',
+      'Dán token vào form bên dưới',
+    ],
+  },
+  {
+    value: 'github',
+    label: 'GitHub',
+    provider: PROVIDER.GITHUB,
+    defaultLabelPlaceholder: 'VD: GitHub (@username)',
+    summary: 'Quản lý GitHub Repositories, Actions Variables & Secrets, Workflows.',
+    scopeRequirement: 'Scopes: repo, workflow (Personal Access Token)',
+    guideSteps: [
+      'GitHub > Settings > Developer Settings > Personal Access Tokens',
+      'Generate New Token (Classic) với quyền repo và workflow',
       'Dán token vào form bên dưới',
     ],
   },

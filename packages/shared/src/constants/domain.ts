@@ -9,6 +9,7 @@ export const RESOURCE_KIND = {
   SUPABASE_PROJECT: 'supabase_project',
   EDGE_FUNCTION: 'edge_function',
   GITLAB_PROJECT: 'gitlab_project',
+  GITHUB_REPO: 'github_repo',
 } as const;
 
 export type ResourceKind = (typeof RESOURCE_KIND)[keyof typeof RESOURCE_KIND];

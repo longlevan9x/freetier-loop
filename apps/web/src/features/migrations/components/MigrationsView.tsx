@@ -32,8 +32,8 @@ import { SavedMigrationsCard } from './SavedMigrations/SavedMigrationsCard';
 export const MigrationsView = () => {
   const queryClient = useQueryClient();
 
-  // Active Tab
-  const [activeTab, setActiveTab] = useState<MigrationTabId>('builder');
+  // Active Tab: default to 'saved' (Quy trình đã lưu)
+  const [activeTab, setActiveTab] = useState<MigrationTabId>('saved');
 
   // Modular Pipeline State
   const [pipelineSteps, setPipelineSteps] = useState<PipelineStepItem[]>([
@@ -52,6 +52,8 @@ export const MigrationsView = () => {
   const [resourceId, setResourceId] = useState('');
   const [gitlabAccountId, setGitlabAccountId] = useState('');
   const [gitlabProjectId, setGitlabProjectId] = useState('');
+  const [githubAccountId, setGithubAccountId] = useState('');
+  const [githubRepo, setGithubRepo] = useState('');
   const [migrationName, setMigrationName] = useState(
     'Cập nhật Token ➔ Deploy GitLab ➔ Transfer Vercel',
   );
@@ -86,13 +88,31 @@ export const MigrationsView = () => {
   });
 
   const resourcesQuery = useQuery({
-    queryKey: queryKeys.resources.all,
+    queryKey: queryKeys.resources.list({ topLevelOnly: 'true', limit: 100 }),
     queryFn: async () => {
-      const res = await apiClient.api.v1.resources.$get({ query: {} });
+      const res = await apiClient.api.v1.resources.$get({
+        query: { topLevelOnly: 'true', limit: '100' },
+      });
       if (!res.ok) return [];
       const json = await res.json();
       return json.data;
     },
+    refetchInterval: 3000,
+  });
+
+  const accountResourcesQuery = useQuery({
+    queryKey: queryKeys.resources.list({ accountId: sourceAccountId, limit: 100 }),
+    queryFn: async () => {
+      if (!sourceAccountId) return [];
+      const res = await apiClient.api.v1.resources.$get({
+        query: { accountId: sourceAccountId, limit: '100' },
+      });
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.data;
+    },
+    enabled: Boolean(sourceAccountId),
+    refetchInterval: 3000,
   });
 
   const jobsQuery = useQuery({
@@ -138,18 +158,33 @@ export const MigrationsView = () => {
   });
 
   const accounts = accountsQuery.data ?? [];
-  const resources = (resourcesQuery.data ?? [])
-    .filter((r) => !r.parentId)
-    .map((r) => ({
-      id: r.id,
-      providerAccountId: r.providerAccountId,
-      name: r.name,
-      kind: r.kind,
-    }));
+  const rawResources = [...(resourcesQuery.data ?? []), ...(accountResourcesQuery.data ?? [])];
+  const uniqueResourcesMap = new Map<
+    string,
+    {
+      id: string;
+      providerAccountId: string;
+      name: string;
+      kind: string;
+      data?: Record<string, unknown>;
+    }
+  >();
+  for (const r of rawResources) {
+    if (!r.parentId && !uniqueResourcesMap.has(r.id)) {
+      uniqueResourcesMap.set(r.id, {
+        id: r.id,
+        providerAccountId: r.providerAccountId,
+        name: r.name,
+        kind: r.kind,
+        data: r.data,
+      });
+    }
+  }
+  const resources = Array.from(uniqueResourcesMap.values());
   const activeJob = activeJobQuery.data ?? (jobsQuery.data ?? [])[0] ?? null;
   const gitlabAccounts = accounts.filter((a) => a.provider === 'gitlab');
   const selectedGitLabAccount = gitlabAccounts.find((a) => a.id === gitlabAccountId);
-  const gitlabProjects = (resourcesQuery.data ?? [])
+  const gitlabProjects = rawResources
     .filter(
       (r) =>
         r.kind === 'gitlab_project' &&
@@ -157,11 +192,19 @@ export const MigrationsView = () => {
     )
     .map((r) => ({ id: r.id, externalId: r.externalId, name: r.name }));
 
+  const githubAccounts = accounts.filter((a) => a.provider === 'github');
+
   useEffect(() => {
     if (!gitlabAccountId && gitlabAccounts[0]?.id) {
       setGitlabAccountId(gitlabAccounts[0].id);
     }
   }, [gitlabAccounts, gitlabAccountId]);
+
+  useEffect(() => {
+    if (!githubAccountId && githubAccounts[0]?.id) {
+      setGithubAccountId(githubAccounts[0].id);
+    }
+  }, [githubAccounts, githubAccountId]);
 
   // Pre-built template selection
   const handleSelectPrebuiltTemplate = (tpl: PrebuiltTemplate) => {
@@ -219,6 +262,8 @@ export const MigrationsView = () => {
       resourceId,
       ...(gitlabAccountId ? { gitlabAccountId } : {}),
       ...(gitlabProjectId.trim() ? { gitlabProjectId: gitlabProjectId.trim() } : {}),
+      ...(githubAccountId ? { githubAccountId } : {}),
+      ...(githubRepo.trim() ? { githubRepo: githubRepo.trim() } : {}),
       steps: pipelineSteps.map((s) => s.actionId),
       createdAt: Date.now(),
     };
@@ -245,7 +290,31 @@ export const MigrationsView = () => {
     }
   };
 
-  const handleLoadSavedMigration = (item: SavedMigration) => {
+  const handleNewMigration = () => {
+    setTemplate(MIGRATION_TEMPLATE.VERCEL_GITLAB_CUTOVER);
+    setPipelineSteps([
+      createStepItem('gitlab.rewire-vars'),
+      createStepItem('gitlab.trigger-pipeline'),
+      createStepItem('vercel.sync-rules'),
+      createStepItem('vercel.move-domains'),
+    ]);
+    setMigrationName('Quy trình di chuyển mới');
+    setSourceAccountId('');
+    setTargetAccountId('');
+    setResourceId('');
+    setGitlabProjectId('');
+    if (gitlabAccounts[0]?.id) {
+      setGitlabAccountId(gitlabAccounts[0].id);
+    }
+    setGithubRepo('');
+    if (githubAccounts[0]?.id) {
+      setGithubAccountId(githubAccounts[0].id);
+    }
+    setWizardError(null);
+    setActiveTab('builder');
+  };
+
+  const handleEditSavedMigration = (item: SavedMigration) => {
     setTemplate(item.template);
     setSourceAccountId(item.sourceAccountId);
     setTargetAccountId(item.targetAccountId);
@@ -254,9 +323,26 @@ export const MigrationsView = () => {
       setGitlabAccountId(item.gitlabAccountId);
     }
     setGitlabProjectId(item.gitlabProjectId ?? '');
+    if (item.githubAccountId) {
+      setGithubAccountId(item.githubAccountId);
+    }
+    setGithubRepo(item.githubRepo ?? '');
     setPipelineSteps(item.steps.map(createStepItem));
     setMigrationName(item.name);
+    setWizardError(null);
     setActiveTab('builder');
+  };
+
+  const handleViewLogs = (item: SavedMigration) => {
+    if (item.lastJobId) {
+      setSelectedJobId(item.lastJobId);
+    } else {
+      const firstJob = jobsQuery.data?.[0];
+      if (firstJob) {
+        setSelectedJobId(firstJob.id);
+      }
+    }
+    setActiveTab('timeline');
   };
 
   // Auto recommend strategy
@@ -291,6 +377,8 @@ export const MigrationsView = () => {
             customStepTypes: pipelineSteps.map((s) => s.actionId),
             ...(gitlabAccountId ? { gitlabAccountId } : {}),
             ...(gitlabProjectId.trim() ? { gitlabProjectId: gitlabProjectId.trim() } : {}),
+            ...(githubAccountId ? { githubAccountId } : {}),
+            ...(githubRepo.trim() ? { githubRepo: githubRepo.trim() } : {}),
           },
         },
       });
@@ -316,6 +404,85 @@ export const MigrationsView = () => {
       setWizardError(formatApiError(err, 'Failed to create migration plan'));
     },
   });
+
+  const runSavedMutation = useMutation({
+    mutationFn: async (item: SavedMigration) => {
+      const createRes = await apiClient.api.v1.jobs.$post({
+        json: {
+          template: item.template,
+          sourceAccountId: item.sourceAccountId,
+          targetAccountId: item.targetAccountId,
+          resourceId: item.resourceId,
+          input: {
+            customStepTypes: item.steps,
+            ...(item.gitlabAccountId ? { gitlabAccountId: item.gitlabAccountId } : {}),
+            ...(item.gitlabProjectId ? { gitlabProjectId: item.gitlabProjectId } : {}),
+            ...(item.githubAccountId ? { githubAccountId: item.githubAccountId } : {}),
+            ...(item.githubRepo ? { githubRepo: item.githubRepo } : {}),
+          },
+        },
+      });
+      const createBody = await createRes.json();
+      if (!createRes.ok) throw createBody;
+      const jobId = createBody.data.id;
+
+      const planRes = await apiClient.api.v1.jobs[':id'].plan.$post({
+        param: { id: jobId },
+      });
+      const planBody = await planRes.json();
+      if (!planRes.ok) throw planBody;
+      return { job: planBody.data, savedId: item.id };
+    },
+    onSuccess: ({ job, savedId }) => {
+      setWizardError(null);
+      setSelectedJobId(job.id);
+      setConfirmText('');
+      setSavedMigrations((prev) => {
+        const next = prev.map((m) =>
+          m.id === savedId ? { ...m, lastJobId: job.id, updatedAt: Date.now() } : m,
+        );
+        try {
+          localStorage.setItem('freetier_saved_migrations', JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+      setActiveTab('timeline');
+      void queryClient.invalidateQueries({ queryKey: queryKeys.jobs.all });
+    },
+    onError: (err) => {
+      setWizardError(formatApiError(err, 'Không thể khởi tạo migration'));
+      setActiveTab('builder');
+    },
+  });
+
+  const handleRunSavedMigration = (item: SavedMigration) => {
+    setTemplate(item.template);
+    setSourceAccountId(item.sourceAccountId);
+    setTargetAccountId(item.targetAccountId);
+    setResourceId(item.resourceId);
+    if (item.gitlabAccountId) {
+      setGitlabAccountId(item.gitlabAccountId);
+    }
+    setGitlabProjectId(item.gitlabProjectId ?? '');
+    if (item.githubAccountId) {
+      setGithubAccountId(item.githubAccountId);
+    }
+    setGithubRepo(item.githubRepo ?? '');
+    setPipelineSteps(item.steps.map(createStepItem));
+    setMigrationName(item.name);
+
+    if (!item.sourceAccountId || !item.targetAccountId || !item.resourceId) {
+      setWizardError(
+        'Migration này chưa đủ thông tin tài khoản / tài nguyên. Hãy hoàn thiện trước khi chạy.',
+      );
+      setActiveTab('builder');
+      return;
+    }
+
+    runSavedMutation.mutate(item);
+  };
 
   const confirmAndRunMutation = useMutation({
     mutationFn: async (job: JobDto) => {
@@ -401,14 +568,19 @@ export const MigrationsView = () => {
   const isGitLabInvalid =
     hasGitLabStep && (!gitlabAccountId || (isGitLabUserToken && !gitlabProjectId.trim()));
 
+  const hasGitHubStep = pipelineSteps.some(
+    (s) => s.actionId === 'github.rewire-vars' || s.actionId === 'github.trigger-workflow',
+  );
+  const isGitHubInvalid = hasGitHubStep && (!githubAccountId || !githubRepo.trim());
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Migration Center · Pipeline Builder</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Migration Center</h1>
         <p className="text-sm text-zinc-400">
-          Xây dựng quy trình di chuyển tuần tự từng bước, nạp mẫu có sẵn, lưu cấu hình và thực thi
-          an toàn.
+          Quản lý quy trình đã lưu, thiết kế pipeline mới, thực thi chuyển tài nguyên và theo dõi
+          log chi tiết.
         </p>
       </div>
 
@@ -416,11 +588,26 @@ export const MigrationsView = () => {
       <MigrationTabs
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        onNewMigration={handleNewMigration}
         savedCount={savedMigrations.length}
         activeJobStatus={activeJob?.status}
       />
 
-      {/* TAB 1: MODULAR PIPELINE BUILDER */}
+      {/* TAB 1: SAVED MIGRATIONS (Default view) */}
+      {activeTab === 'saved' && (
+        <SavedMigrationsCard
+          savedMigrations={savedMigrations}
+          accounts={accounts}
+          onOpenBuilder={handleNewMigration}
+          onDeleteSavedMigration={handleDeleteSavedMigration}
+          onEditSavedMigration={handleEditSavedMigration}
+          onRunSavedMigration={handleRunSavedMigration}
+          onViewLogs={handleViewLogs}
+          isStartingJob={runSavedMutation.isPending}
+        />
+      )}
+
+      {/* TAB 2: MODULAR PIPELINE BUILDER */}
       {activeTab === 'builder' && (
         <BentoGrid>
           <BentoCard
@@ -457,6 +644,10 @@ export const MigrationsView = () => {
                 gitlabProjectId={gitlabProjectId}
                 setGitlabProjectId={setGitlabProjectId}
                 gitlabProjects={gitlabProjects}
+                githubAccountId={githubAccountId}
+                setGithubAccountId={setGithubAccountId}
+                githubRepo={githubRepo}
+                setGithubRepo={setGithubRepo}
                 steps={pipelineSteps}
               />
 
@@ -473,7 +664,8 @@ export const MigrationsView = () => {
                   !targetAccountId ||
                   pipelineSteps.length === 0 ||
                   createAndPlanMutation.isPending ||
-                  isGitLabInvalid
+                  isGitLabInvalid ||
+                  isGitHubInvalid
                 }
                 isCreatingPlan={createAndPlanMutation.isPending}
                 saveSuccessMessage={saveSuccessMessage ?? undefined}
@@ -483,17 +675,6 @@ export const MigrationsView = () => {
             </div>
           </BentoCard>
         </BentoGrid>
-      )}
-
-      {/* TAB 2: SAVED MIGRATIONS */}
-      {activeTab === 'saved' && (
-        <SavedMigrationsCard
-          savedMigrations={savedMigrations}
-          accounts={accounts}
-          onOpenBuilder={() => setActiveTab('builder')}
-          onDeleteSavedMigration={handleDeleteSavedMigration}
-          onLoadSavedMigration={handleLoadSavedMigration}
-        />
       )}
 
       {/* TAB 3: TIMELINE & EXECUTION */}

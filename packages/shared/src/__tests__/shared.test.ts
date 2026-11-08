@@ -11,12 +11,13 @@ import { AppError, errResult, newId, okResult } from '../lib/index';
 import { createProviderAccountSchema, ok } from '../schemas/index';
 
 describe('@freetier-loop/shared', () => {
-  it('exposes provider constants including cloudflare, vercel, supabase, and gitlab', () => {
+  it('exposes provider constants including cloudflare, vercel, supabase, gitlab, and github', () => {
     expect(PROVIDER_VALUES).toEqual([
       PROVIDER.CLOUDFLARE,
       PROVIDER.VERCEL,
       PROVIDER.SUPABASE,
       PROVIDER.GITLAB,
+      PROVIDER.GITHUB,
     ]);
   });
 

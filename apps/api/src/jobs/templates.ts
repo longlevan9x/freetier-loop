@@ -338,4 +338,39 @@ export const MIGRATION_TEMPLATE_CATALOG: Record<MigrationTemplate, TemplateCatal
       STEP_TYPE.GITLAB_REWIRE_VARS,
     ]),
   },
+
+  [MIGRATION_TEMPLATE.VERCEL_GITHUB_CUTOVER]: {
+    template: MIGRATION_TEMPLATE.VERCEL_GITHUB_CUTOVER,
+    label: MIGRATION_TEMPLATE_LABEL[MIGRATION_TEMPLATE.VERCEL_GITHUB_CUTOVER],
+    provider: PROVIDER.VERCEL,
+    supportedResourceKinds: [RESOURCE_KIND.VERCEL_PROJECT, RESOURCE_KIND.PROJECT_DOMAIN],
+    description:
+      '3-in-1 Full Cutover: Moves custom domains, syncs Vercel rules (rewrites, redirects, headers), and auto-rewires GitHub Actions variables (VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID) in a single workflow.',
+    destructive: true,
+    manualSteps: [],
+    warnings: [
+      'GitHub Actions variables will be updated to point to the target Vercel account.',
+      'Ensure GitHub Personal Access Token has repo and workflow permissions.',
+    ],
+    inputSchema: {
+      type: 'object',
+      properties: {
+        githubRepo: {
+          type: 'string',
+          description: 'GitHub repository (owner/repo or repo name)',
+        },
+        githubToken: {
+          type: 'string',
+          description: 'GitHub Personal Access Token with repo scope',
+        },
+      },
+    },
+    defaultSteps: toStepSummaries([
+      STEP_TYPE.PREFLIGHT_VERIFY_ACCOUNTS,
+      STEP_TYPE.SNAPSHOT_RESOURCE,
+      STEP_TYPE.VERCEL_MOVE_DOMAINS,
+      STEP_TYPE.VERCEL_SYNC_RULES,
+      STEP_TYPE.GITHUB_REWIRE_VARS,
+    ]),
+  },
 };

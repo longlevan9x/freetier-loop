@@ -1,4 +1,4 @@
-﻿import { z } from 'zod';
+import { z } from 'zod';
 import { RESOURCE_KIND_VALUES } from '../constants/domain';
 import { cursorPaginationQuerySchema } from './pagination';
 
@@ -7,6 +7,7 @@ export const listResourcesQuerySchema = cursorPaginationQuerySchema.extend({
   kind: z.enum(RESOURCE_KIND_VALUES).optional(),
   parentId: z.string().min(1).optional(),
   q: z.string().trim().max(120).optional(),
+  topLevelOnly: z.enum(['true', 'false']).optional(),
 });
 
 export type ListResourcesQuery = z.infer<typeof listResourcesQuerySchema>;

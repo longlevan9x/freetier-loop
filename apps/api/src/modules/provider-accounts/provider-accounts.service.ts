@@ -446,6 +446,58 @@ export class ProviderAccountsService {
           err instanceof Error ? err.message : String(err),
         );
       }
+    } else if (decryptable.provider === PROVIDER.GITHUB) {
+      const githubProvider = this.registry.getCapability(
+        PROVIDER.GITHUB,
+        CAPABILITY.GITHUB_VARIABLES,
+      );
+      try {
+        const repos = await githubProvider.listRepos(ctx);
+        for (const repo of repos) {
+          const repoResource = await this.resourcesRepo.upsert({
+            providerAccountId: id,
+            kind: RESOURCE_KIND.GITHUB_REPO,
+            externalId: String(repo.id),
+            name: repo.fullName,
+            data: {
+              id: repo.id,
+              name: repo.name,
+              fullName: repo.fullName,
+              private: repo.private,
+              defaultBranch: repo.defaultBranch,
+              htmlUrl: repo.htmlUrl,
+              description: repo.description,
+            },
+            nowMs,
+          });
+          syncedCount++;
+
+          if (budget.remaining >= 2) {
+            try {
+              const vars = await githubProvider.listVariables(ctx, repo.fullName);
+              for (const v of vars) {
+                await this.resourcesRepo.upsert({
+                  providerAccountId: id,
+                  kind: RESOURCE_KIND.ENV_VAR,
+                  externalId: `${repo.id}:${v.name}`,
+                  name: v.name,
+                  parentId: repoResource.id,
+                  data: {
+                    type: 'actions_variable',
+                    value: v.value,
+                  },
+                  nowMs,
+                });
+                syncedCount++;
+              }
+            } catch {
+              // Ignore if variable listing is forbidden on specific repo
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('GitHub repo sync skipped:', err instanceof Error ? err.message : String(err));
+      }
     }
 
     await this.repo.update(id, { lastSyncedAt: nowMs }, nowMs);

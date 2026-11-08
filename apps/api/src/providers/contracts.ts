@@ -283,6 +283,39 @@ export interface GitLabVariableProvider {
   ): Promise<GitLabPipeline>;
 }
 
+export type GitHubRepo = {
+  id: number;
+  name: string;
+  fullName: string;
+  private: boolean;
+  defaultBranch: string;
+  htmlUrl: string;
+  description?: string | null;
+};
+
+export type GitHubVariable = {
+  name: string;
+  value: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export interface GitHubVariableProvider {
+  listRepos(ctx: ProviderContext): Promise<GitHubRepo[]>;
+  listVariables(ctx: ProviderContext, ownerAndRepo: string): Promise<GitHubVariable[]>;
+  upsertVariable(
+    ctx: ProviderContext,
+    ownerAndRepo: string,
+    variable: { name: string; value: string },
+  ): Promise<void>;
+  triggerWorkflow(
+    ctx: ProviderContext,
+    ownerAndRepo: string,
+    workflowId: string | number,
+    ref?: string,
+  ): Promise<void>;
+}
+
 export type CapabilityMap = {
   account_verifier: AccountVerifier;
   zones: ZoneProvider;
@@ -295,6 +328,7 @@ export type CapabilityMap = {
   sql_query: SqlQueryProvider;
   usage: UsageProvider;
   gitlab_variables: GitLabVariableProvider;
+  github_variables: GitHubVariableProvider;
 };
 
 export interface ProviderAdapter {

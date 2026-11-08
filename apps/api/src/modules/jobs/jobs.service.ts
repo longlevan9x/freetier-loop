@@ -632,6 +632,18 @@ export class JobsService {
       }
     }
 
+    const githubAccountId = inputData.githubAccountId as string | undefined;
+    let githubAccount = null;
+    if (githubAccountId) {
+      githubAccount = await this.accountsRepo.getDecryptable(githubAccountId);
+    } else {
+      const allAccounts = await this.accountsRepo.list();
+      const firstGitHub = allAccounts.find((a) => a.provider === PROVIDER.GITHUB);
+      if (firstGitHub) {
+        githubAccount = await this.accountsRepo.getDecryptable(firstGitHub.id);
+      }
+    }
+
     return {
       job,
       step,
@@ -654,6 +666,15 @@ export class JobsService {
             gitlabCtx: {
               token: gitlabAccount.decryptedToken,
               externalAccountId: gitlabAccount.externalAccountId,
+              ...(this.fetchFn ? { fetchFn: this.fetchFn } : {}),
+            },
+          }
+        : {}),
+      ...(githubAccount
+        ? {
+            githubCtx: {
+              token: githubAccount.decryptedToken,
+              externalAccountId: githubAccount.externalAccountId,
               ...(this.fetchFn ? { fetchFn: this.fetchFn } : {}),
             },
           }

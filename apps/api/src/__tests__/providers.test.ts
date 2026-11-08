@@ -336,4 +336,109 @@ describe('Providers & HTTP Client (T-041..T-045B)', () => {
     expect(pipeline.ref).toBe('main');
     expect(pipeline.webUrl).toContain('/pipelines/888');
   });
+
+  it('GitHubAdapter verifies token, lists repos, reads variables, upserts variable and triggers workflow', async () => {
+    const registry = createDefaultProviderRegistry();
+    const variablesStore: Record<string, string> = {
+      VERCEL_TOKEN: 'old_gh_token',
+      VERCEL_ORG_ID: 'old_gh_org',
+    };
+
+    let workflowDispatched = false;
+
+    const fetchFn: typeof fetch = async (input, init) => {
+      const url = String(input);
+      if (url.includes('/user/repos')) {
+        return jsonResponse([
+          {
+            id: 101,
+            name: 'frontend-next',
+            full_name: 'octocat/frontend-next',
+            html_url: 'https://github.com/octocat/frontend-next',
+            default_branch: 'main',
+            private: false,
+          },
+        ]);
+      }
+      if (url.endsWith('/user')) {
+        return jsonResponse({
+          id: 583231,
+          login: 'octocat',
+          name: 'The Octocat',
+          type: 'User',
+        });
+      }
+      if (url.includes('/actions/variables/VERCEL_TOKEN')) {
+        if (init?.method === 'PATCH') {
+          const body = JSON.parse(String(init.body)) as { value: string };
+          variablesStore.VERCEL_TOKEN = body.value;
+          return new Response(null, { status: 204 });
+        }
+        return jsonResponse({
+          name: 'VERCEL_TOKEN',
+          value: variablesStore.VERCEL_TOKEN,
+          created_at: '2026-11-08T00:00:00Z',
+          updated_at: '2026-11-08T00:00:00Z',
+        });
+      }
+      if (url.includes('/actions/variables/VERCEL_PROJECT_ID')) {
+        return jsonResponse({ message: 'Not Found' }, 404);
+      }
+      if (url.includes('/actions/variables')) {
+        if (init?.method === 'POST') {
+          const body = JSON.parse(String(init.body)) as { name: string; value: string };
+          variablesStore[body.name] = body.value;
+          return new Response(null, { status: 201 });
+        }
+        return jsonResponse({
+          total_count: Object.keys(variablesStore).length,
+          variables: Object.entries(variablesStore).map(([name, value]) => ({
+            name,
+            value,
+            created_at: '2026-11-08T00:00:00Z',
+            updated_at: '2026-11-08T00:00:00Z',
+          })),
+        });
+      }
+      if (url.includes('/dispatches')) {
+        workflowDispatched = true;
+        return new Response(null, { status: 204 });
+      }
+      return jsonResponse({});
+    };
+
+    const ctx = { token: 'ghp_test123', fetchFn };
+    const verifier = registry.getCapability(PROVIDER.GITHUB, CAPABILITY.ACCOUNT_VERIFIER);
+    const verified = await verifier.verify(ctx);
+    expect(verified.valid).toBe(true);
+    expect(verified.externalAccountId).toBe('583231');
+    expect(verified.labelSuggested).toBe('octocat');
+
+    const github = registry.getCapability(PROVIDER.GITHUB, CAPABILITY.GITHUB_VARIABLES);
+    const repos = await github.listRepos(ctx);
+    expect(repos).toHaveLength(1);
+    expect(repos[0]?.fullName).toBe('octocat/frontend-next');
+
+    const vars = await github.listVariables(ctx, 'octocat/frontend-next');
+    expect(vars).toHaveLength(2);
+    expect(vars.find((v) => v.name === 'VERCEL_TOKEN')?.value).toBe('old_gh_token');
+
+    // Update existing
+    await github.upsertVariable(ctx, 'octocat/frontend-next', {
+      name: 'VERCEL_TOKEN',
+      value: 'new_gh_token',
+    });
+    expect(variablesStore.VERCEL_TOKEN).toBe('new_gh_token');
+
+    // Create new
+    await github.upsertVariable(ctx, 'octocat/frontend-next', {
+      name: 'VERCEL_PROJECT_ID',
+      value: 'prj_gh_123',
+    });
+    expect(variablesStore.VERCEL_PROJECT_ID).toBe('prj_gh_123');
+
+    // Trigger workflow dispatch
+    await github.triggerWorkflow(ctx, 'octocat/frontend-next', 'deploy.yml', 'main');
+    expect(workflowDispatched).toBe(true);
+  });
 });

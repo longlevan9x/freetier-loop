@@ -31,6 +31,7 @@ export class SubrequestBudget {
 export type HttpClientOptions = {
   baseUrl: string;
   token?: string;
+  headers?: Record<string, string>;
   timeoutMs?: number;
   maxRetries?: number;
   retryBaseMs?: number;
@@ -100,6 +101,7 @@ export const createHttpClient = (options: HttpClientOptions): HttpClient => {
         ...(req.body !== undefined && typeof req.body !== 'string'
           ? { [HEADER.CONTENT_TYPE]: 'application/json' }
           : {}),
+        ...options.headers,
         ...req.headers,
       };
 
@@ -191,7 +193,12 @@ export const createHttpClient = (options: HttpClientOptions): HttpClient => {
           return undefined as T;
         }
 
-        const json = await response.json();
+        const text = await response.text();
+        if (!text || !text.trim()) {
+          return undefined as T;
+        }
+
+        const json = JSON.parse(text);
         return req.schema ? req.schema.parse(json) : (json as T);
       }
 

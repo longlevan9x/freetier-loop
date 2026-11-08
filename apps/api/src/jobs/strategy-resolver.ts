@@ -82,7 +82,11 @@ export class StrategyResolver {
       }
       return {
         recommendedTemplate: MIGRATION_TEMPLATE.VERCEL_PROJECT_RECREATE,
-        alternatives: [MIGRATION_TEMPLATE.VERCEL_GITLAB_CUTOVER, MIGRATION_TEMPLATE.ENV_REWIRE],
+        alternatives: [
+          MIGRATION_TEMPLATE.VERCEL_GITHUB_CUTOVER,
+          MIGRATION_TEMPLATE.VERCEL_GITLAB_CUTOVER,
+          MIGRATION_TEMPLATE.ENV_REWIRE,
+        ],
         reason:
           'At least one Vercel account is Hobby tier; project recreation from Git repository with Blue-Green domain cutover is required.',
       };
@@ -91,7 +95,11 @@ export class StrategyResolver {
     if (input.resource.kind === RESOURCE_KIND.PROJECT_DOMAIN) {
       return {
         recommendedTemplate: MIGRATION_TEMPLATE.VERCEL_DOMAIN_MOVE,
-        alternatives: [MIGRATION_TEMPLATE.VERCEL_GITLAB_CUTOVER, MIGRATION_TEMPLATE.DNS_REPOINT],
+        alternatives: [
+          MIGRATION_TEMPLATE.VERCEL_GITHUB_CUTOVER,
+          MIGRATION_TEMPLATE.VERCEL_GITLAB_CUTOVER,
+          MIGRATION_TEMPLATE.DNS_REPOINT,
+        ],
         reason: 'Move custom domain attachment between accounts.',
       };
     }

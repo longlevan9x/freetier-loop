@@ -3,6 +3,7 @@ export const PROVIDER = {
   VERCEL: 'vercel',
   SUPABASE: 'supabase',
   GITLAB: 'gitlab',
+  GITHUB: 'github',
 } as const;
 
 export type Provider = (typeof PROVIDER)[keyof typeof PROVIDER];
@@ -13,6 +14,7 @@ export const PROVIDER_LABEL: Record<Provider, string> = {
   [PROVIDER.VERCEL]: 'Vercel',
   [PROVIDER.SUPABASE]: 'Supabase',
   [PROVIDER.GITLAB]: 'GitLab',
+  [PROVIDER.GITHUB]: 'GitHub',
 };
 
 export const ACCOUNT_STATUS = {
@@ -74,6 +76,7 @@ export const CAPABILITY = {
   SQL_QUERY: 'sql_query',
   USAGE: 'usage',
   GITLAB_VARIABLES: 'gitlab_variables',
+  GITHUB_VARIABLES: 'github_variables',
 } as const;
 
 export type Capability = (typeof CAPABILITY)[keyof typeof CAPABILITY];

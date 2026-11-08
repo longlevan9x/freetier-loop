@@ -6,7 +6,7 @@ import {
   type ResourceKind,
   newId,
 } from '@freetier-loop/shared';
-import { and, desc, eq, like, lt } from 'drizzle-orm';
+import { and, desc, eq, isNull, like, lt } from 'drizzle-orm';
 import type { AppDatabase } from '../../platform/db';
 
 export type UpsertResourceInput = {
@@ -133,6 +133,8 @@ export class ResourcesRepository {
     }
     if (query.parentId) {
       conditions.push(eq(resources.parentId, query.parentId));
+    } else if (query.topLevelOnly === 'true') {
+      conditions.push(isNull(resources.parentId));
     }
     if (query.q) {
       conditions.push(like(resources.name, `%${query.q}%`));
